@@ -1,0 +1,9 @@
+{
+  "name": "pangeya-ai-backend",
+  "version": "1.0.0",
+  "description": "Vercel serverless functions for the Pangeya AI essay platform",
+  "type": "module",
+  "dependencies": {
+    "openai": "^4.4.0"
+  }
+}
