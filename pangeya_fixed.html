@@ -1,0 +1,2644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pangeya Essay Platform – New Year Edition</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <!--
+    This file is based on the original Pangeya Essay Platform hosted on GitHub pages.
+    The markup, styling and scripts have been preserved so the core functionality
+    (writing, saving, editing and printing essays; teacher mode; theme switching)
+    continue to work. This edition preserves the Neon, Light and Dark themes
+    from the original. A New Year mode can also be toggled on/off. When active
+    it adds 3D decorations (stocking by the name field, tree/gift/Santa icons
+    on the buttons and essay cards) and a gentle snowfall effect near the top
+    of the page. A small fixed button in the bottom‑right corner allows users
+    to enable or disable the New Year mode without interfering with normal
+    operation or teacher features.
+    
+    The Pangeya theme (green palette) from the original edition has been removed
+    in this version as per user request. All references to the Pangeya theme,
+    including styles, buttons and event handlers, have been stripped out to
+    simplify the theme logic.
+  -->
+  <style>
+    :root {
+      /* base colours and sizing inherited from the original site */
+      --bg-gradient: radial-gradient(circle at top left, #3b0764, #1e1b4b 40%, #020617 80%);
+      --card-bg: rgba(15, 23, 42, 0.92);
+      --accent: #a855f7;
+      --accent2: #ec4899;
+      --accent3: #22c55e;
+      --text-main: #e5e7eb;
+      --text-muted: #9ca3af;
+      --border-soft: rgba(148, 163, 184, 0.3);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    /* Light and dark themes mirror the original implementation */
+    .light-theme {
+      --bg-gradient: linear-gradient(135deg, #e0e7ff, #f5f3ff);
+      --card-bg: #ffffff;
+      --text-main: #111827;
+      --text-muted: #6b7280;
+      --border-soft: rgba(148, 163, 184, 0.5);
+    }
+    .dark-theme {
+      --bg-gradient: radial-gradient(circle at top, #020617, #020617 40%, #000000 100%);
+      --card-bg: #020617;
+      --text-main: #e5e7eb;
+      --text-muted: #9ca3af;
+    }
+
+    /*
+      Glass theme – inspired by iOS style glass surfaces.
+      It uses translucent backgrounds and applies a backdrop blur on the
+      container to give the impression of frosted glass.  Note: the glass
+      theme remains defined here for completeness, but there is no built‑in
+      button to activate it. If needed, you can add your own trigger.
+    */
+    .glass-theme {
+      --bg-gradient: linear-gradient(135deg, rgba(255,255,255,0.35), rgba(230,230,230,0.2));
+      --card-bg: rgba(255, 255, 255, 0.2);
+      --text-main: #0f172a;
+      --text-muted: #334155;
+      --border-soft: rgba(15, 23, 42, 0.25);
+    }
+    .glass-theme .inner {
+      backdrop-filter: blur(16px);
+    }
+
+    /* Container styling preserved from original */
+    .container {
+      width: 100%;
+      max-width: 900px;
+      background: linear-gradient(145deg, rgba(88, 28, 135, 0.9), rgba(30, 64, 175, 0.9));
+      padding: 2px;
+      border-radius: 26px;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.55);
+    }
+    .inner {
+      background: var(--card-bg);
+      border-radius: 24px;
+      padding: 20px 20px 18px;
+    }
+    @media (min-width: 768px) {
+      .inner { padding: 24px 26px 22px; }
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 600;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .subtitle {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+    }
+    .theme-switcher {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .theme-btn {
+      flex: 1;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      background: rgba(15, 23, 42, 0.9);
+      color: #e5e7eb;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all .18s ease;
+    }
+    .theme-btn.active {
+      background: linear-gradient(135deg, #a855f7, #ec4899);
+      color: white;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(168, 85, 247, 0.4);
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 4px;
+      margin-top: 6px;
+    }
+    /* Input and textarea styling retained from original */
+    input[type="text"], textarea {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid var(--border-soft);
+      background: rgba(15, 23, 42, 0.9);
+      color: var(--text-main);
+      padding: 10px 12px;
+      font-size: 14px;
+      outline: none;
+      transition: border .15s ease, box-shadow .15s ease, background .15s ease;
+    }
+    textarea {
+      min-height: 130px;
+      resize: vertical;
+    }
+
+    /* Make the vocabulary definition box smaller.  Users often paste multiple
+       vocab items into this box, so it should not take up as much vertical
+       space as the essay textarea.  The global textarea rule above sets a
+       fairly tall minimum height (130px).  We override it for the vocabulary
+       definition input so that it appears as a compact field, while still
+       allowing users to type or paste multiple lines if needed. */
+    #definition {
+      min-height: 80px;
+    }
+    input[type="text"]:focus, textarea:focus {
+      border-color: #818cf8;
+      box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.7);
+      background: rgba(15, 23, 42, 1);
+    }
+    .btn {
+      width: 100%;
+      border: none;
+      border-radius: 999px;
+      padding: 11px 14px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: transform .1s ease, box-shadow .1s ease, opacity .15s ease;
+      color: white;
+      position: relative; /* to anchor stickers */
+      overflow: hidden;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #a855f7, #ec4899);
+      box-shadow: 0 10px 25px rgba(236, 72, 153, 0.4);
+    }
+    .btn-secondary {
+      background: linear-gradient(135deg, #38bdf8, #6366f1);
+      box-shadow: 0 8px 20px rgba(56, 189, 248, 0.35);
+    }
+    .btn-teacher {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      box-shadow: 0 8px 20px rgba(34, 197, 94, 0.35);
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); box-shadow: none; }
+
+    /* Search controls for essay list – provides a small name search and an AI
+       button.  These controls appear next to the All Essays heading. */
+    .essay-search-controls {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      margin-bottom: 6px;
+      justify-content: flex-end;
+    }
+    .essay-search-controls input {
+      flex: 1;
+      padding: 4px 8px;
+      border-radius: 8px;
+      border: 1px solid var(--border-soft);
+      background: var(--card-bg);
+      color: var(--text-main);
+      font-size: 12px;
+    }
+    .essay-search-controls input::placeholder {
+      color: var(--text-muted);
+      font-style: italic;
+    }
+    .essay-search-controls button {
+      padding: 5px 10px;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 500;
+      color: #ffffff;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      transition: transform .1s ease;
+    }
+    .essay-search-controls button:hover { transform: translateY(-1px); }
+    .essay-search-controls button:active { transform: translateY(0); }
+
+    /* Vocabulary layout styles.  These classes format the vocabulary list
+       and search controls so that the vocabulary section resembles a
+       dictionary with two columns: one for the word and one for its
+       definition.  Search input and buttons mirror the style of the essay
+       search controls. */
+    .vocab-list {
+      margin-top: 6px;
+      max-height: 380px;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+    .vocab-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      background: var(--card-bg);
+      border: 1px solid var(--border-soft);
+      border-radius: 14px;
+      padding: 8px 12px;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+    .vocab-word {
+      flex: 0 0 30%;
+      font-weight: 600;
+      word-break: break-word;
+      margin-right: 8px;
+    }
+    .vocab-definition {
+      flex: 1;
+      color: var(--text-main);
+      word-break: break-word;
+    }
+
+    /* Small delete button for each vocabulary item.  The button appears at the end
+       of each vocab row and allows users to remove an entry from the database.
+       It is styled similarly to other chips on the site but sized more compactly. */
+    .vocab-delete-btn {
+      margin-left: auto;
+      padding: 2px 6px;
+      font-size: 11px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      color: #ffffff;
+      background: #ef4444; /* red colour for delete */
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+      transition: transform 0.1s ease;
+    }
+    .vocab-delete-btn:hover { transform: translateY(-1px); }
+    .vocab-delete-btn:active { transform: translateY(0); }
+
+    .vocab-search-controls {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .vocab-search-controls input {
+      flex: 1;
+      padding: 4px 8px;
+      border-radius: 8px;
+      border: 1px solid var(--border-soft);
+      background: var(--card-bg);
+      color: var(--text-main);
+      font-size: 12px;
+    }
+    .vocab-search-controls input::placeholder {
+      color: var(--text-muted);
+      font-style: italic;
+    }
+    .vocab-search-controls button {
+      padding: 5px 10px;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 500;
+      color: #ffffff;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      transition: transform .1s ease;
+    }
+    .vocab-search-controls button:hover { transform: translateY(-1px); }
+    .vocab-search-controls button:active { transform: translateY(0); }
+
+    /* Vocabulary page navigation button fixed to the top‑right corner. */
+    .vocab-page-btn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 500;
+      text-decoration: none;
+      z-index: 1000;
+      transition: transform .1s ease, box-shadow .1s ease;
+    }
+    .vocab-page-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+    }
+
+    /* Chat page navigation button fixed below the vocabulary button. */
+    .chat-page-btn {
+      position: fixed;
+      top: 60px;
+      right: 20px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 500;
+      text-decoration: none;
+      z-index: 1000;
+      transition: transform .1s ease, box-shadow .1s ease;
+    }
+    .chat-page-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+    }
+
+    /* Chat section styling */
+    .chat-messages {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 400px;
+      min-height: 120px;
+      width: 100%;
+      overflow-y: auto;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 10px;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    .chat-message {
+      max-width: 90%;
+      padding: 8px 12px;
+      border-radius: 12px;
+      word-wrap: break-word;
+      white-space: pre-wrap;
+    }
+    .chat-message.user {
+      align-self: flex-end;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #ffffff;
+      border-radius: 12px 12px 0 12px;
+    }
+    .chat-message.assistant {
+      align-self: flex-start;
+      background: rgba(0, 0, 0, 0.2);
+      color: #e5e7eb;
+      border-radius: 12px 12px 12px 0;
+    }
+    .chat-input-area {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .chat-input-area textarea {
+      flex: 1;
+      resize: none;
+      padding: 8px 10px;
+      border-radius: 12px;
+      background: var(--input-bg, rgba(15, 23, 42, 0.8));
+      color: #e5e7eb;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 14px;
+      min-height: 48px;
+    }
+    /* Ensure the send button in the chat input area does not stretch to full width */
+    .chat-input-area button {
+      width: auto;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+
+    /* Styling for the chat image upload button.  This button allows the
+       user to select an image file from their device.  It uses the
+       accent gradient similar to other primary buttons but is sized to
+       its content. */
+    .chat-image-btn {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #ffffff;
+      border: none;
+      border-radius: 999px;
+      /* Reduce padding and font size to make the icon appear smaller */
+      padding: 6px 8px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: transform .1s ease, box-shadow .1s ease;
+    }
+    .chat-image-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+    }
+
+    /* Styling for the clear chat button.  This button mirrors the style of
+       the image upload button but is used to reset the conversation. */
+    .chat-clear-btn {
+      background: linear-gradient(135deg, var(--accent), var (--accent2));
+      color: #ffffff;
+      border: none;
+      border-radius: 999px;
+      /* Match the reduced sizing of the image button */
+      padding: 6px 8px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: transform .1s ease, box-shadow .1s ease;
+    }
+    .chat-clear-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+    }
+    /* Ensure images within chat messages scale nicely and have rounded corners */
+    .chat-message img {
+      max-width: 100%;
+      border-radius: 12px;
+      display: block;
+    }
+    .chat-disclaimer {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      text-align: center;
+    }
+
+    /* Modern chat UI styling */
+    .chat-wrapper {
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 20px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+    .chat-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .chat-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .chat-credit-badge {
+      font-size: 12px;
+      background: var(--accent);
+      color: #ffffff;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+    .chat-body {
+      max-height: 300px;
+      overflow-y: auto;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 8px;
+    }
+    .chat-input-area {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .chat-input-area input {
+      flex: 1;
+      border: 1px solid var(--border-soft);
+      border-radius: 999px;
+      padding: 6px 12px;
+      background: rgba(15, 23, 42, 0.8);
+      color: var(--text-main);
+      font-size: 14px;
+      outline: none;
+    }
+    .send-btn {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none;
+      border-radius: 999px;
+      color: #ffffff;
+      padding: 6px 14px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: transform .1s ease, box-shadow .1s ease;
+    }
+    .send-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+    }
+    .clear-btn {
+      background: transparent;
+      border: 1px solid var(--border-soft);
+      border-radius: 999px;
+      color: var(--text-main);
+      padding: 6px 12px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background .1s ease, transform .1s ease;
+    }
+    .clear-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      transform: translateY(-1px);
+    }
+    .typing {
+      display: flex;
+      justify-content: flex-start;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+    .typing span {
+      display: block;
+      width: 6px;
+      height: 6px;
+      background: var(--text-muted);
+      border-radius: 50%;
+      animation: blink 1.2s infinite ease-in-out;
+    }
+    .typing span:nth-child(2) { animation-delay: .2s; }
+    .typing span:nth-child(3) { animation-delay: .4s; }
+    .hidden { display: none !important; }
+    @keyframes blink {
+      0% { opacity: 0.2; }
+      20% { opacity: 1; }
+      100% { opacity: 0.2; }
+    }
+
+    /* AI feedback block styling inside essays */
+    .ai-feedback {
+      margin-top: 4px;
+      padding: 7px 8px;
+      background: rgba(56, 189, 248, 0.16);
+      border-left: 3px solid #38bdf8;
+      border-radius: 10px;
+      font-size: 13px;
+      color: var(--text-main);
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    /* Pangeya theme overrides removed.
+       Previously there were green palette overrides for buttons and chips
+       associated with the Pangeya theme. Since the Pangeya theme has been
+       deprecated, these rules have been removed entirely. */
+
+    .teacher-panel {
+      display: none;
+      margin-top: 8px;
+    }
+    .teacher-panel input { margin-top: 6px; }
+    .teacher-panel .btn-enter { margin-top: 8px; }
+    .section-title {
+      margin-top: 18px;
+      margin-bottom: 8px;
+      font-size: 15px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .section-title span.icon { font-size: 17px; }
+    .essays-list {
+      margin-top: 4px;
+      max-height: 380px;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+    .essay-card {
+      background: rgba(15, 23, 42, 0.9);
+      border-radius: 18px;
+      padding: 10px 12px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      margin-bottom: 8px;
+      font-size: 13px;
+      position: relative; /* for sticker positioning */
+    }
+    .essay-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 4px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .essay-name { font-weight: 500; }
+    .essay-text {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      overflow-wrap: anywhere;
+      margin-bottom: 6px;
+      margin-top: 2px;
+      color: var(--text-main);
+    }
+    .word-count { /* inserted from script */ }
+    .feedback {
+      margin-top: 4px;
+      padding: 7px 8px;
+      background: rgba(22, 163, 74, 0.16);
+      border-left: 3px solid #22c55e;
+      border-radius: 10px;
+      font-size: 13px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .feedback .fb-check, .feedback .fb-cross {
+      display: block;
+      padding-left: 22px;
+      position: relative;
+      margin: 4px 0;
+    }
+    .feedback .fb-check::before {
+      content: '✔';
+      position: absolute;
+      left: 0;
+      color: #22c55e;
+    }
+    .feedback .fb-cross::before {
+      content: '✘';
+      position: absolute;
+      left: 0;
+      color: #ef4444;
+    }
+    .essay-actions {
+      margin-top: 6px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .chip-btn {
+      border: none;
+      border-radius: 999px;
+      padding: 5px 11px;
+      font-size: 11px;
+      cursor: pointer;
+      color: white;
+    }
+    .chip-edit { background: #22c55e; }
+    .chip-delete { background: #ef4444; }
+    .chip-feedback { background: #0ea5e9; }
+    .chip-btn:active { transform: translateY(1px); }
+    /* Toolbar styling for rich text editing */
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .icon-btn {
+      background: transparent;
+      border: 1px solid var(--border-soft);
+      border-radius: 4px;
+      padding: 4px 6px;
+      font-size: 13px;
+      color: var(--text-main);
+      cursor: pointer;
+    }
+    .icon-btn:hover {
+      background: var(--accent);
+      color: #fff;
+    }
+    .edit-area {
+      min-height: 120px;
+      max-height: 300px;
+      overflow-y: auto;
+      padding: 8px;
+      border: 1px solid var(--border-soft);
+      border-radius: 6px;
+      font-size: 13px;
+      background: var(--card-bg);
+      color: var(--text-main);
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      outline: none;
+    }
+    .feedback-essay {
+      max-height: 200px;
+      overflow-y: auto;
+      margin-bottom: 8px;
+      padding: 8px;
+      border: 1px solid var(--border-soft);
+      border-radius: 6px;
+      font-size: 12px;
+      background: var(--card-bg);
+      color: var(--text-main);
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    /* Light theme adjustments for cards and feedback */
+    .light-theme .essay-card {
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid rgba(0, 0, 0, 0.12);
+    }
+    .light-theme .essay-card .essay-text,
+    .light-theme .essay-card .feedback {
+      color: #111827;
+    }
+    .light-theme .feedback {
+      background: rgba(34, 197, 94, 0.16);
+      border-left: 3px solid #16a34a;
+    }
+    .light-theme .edit-area,
+    .light-theme .feedback-essay {
+      background: #f9fafb;
+      color: #111827;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+    }
+    .light-theme .icon-btn {
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      color: #111827;
+    }
+    .light-theme input[type="text"],
+    .light-theme textarea {
+      background: #f9fafb;
+      color: #111827;
+      border: 1px solid rgba(0, 0, 0, 0.15);
+    }
+    .light-theme input[type="text"]::placeholder,
+    .light-theme textarea::placeholder {
+      color: #6b7280;
+    }
+    .light-theme input[type="text"]:focus,
+    .light-theme textarea:focus {
+      background: #ffffff;
+      border-color: #818cf8;
+      box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.7);
+    }
+    .light-theme .modal-content {
+      background: #ffffff;
+      color: #111827;
+    }
+    .light-theme #editArea,
+    .light-theme #feedbackArea {
+      background: #f9fafb;
+      color: #111827;
+      border: 1px solid rgba(0, 0, 0, 0.15);
+    }
+    .light-theme #editArea:focus,
+    .light-theme #feedbackArea:focus {
+      background: #ffffff;
+      border-color: #818cf8;
+    }
+    /* Highlight, underline and strike styling */
+    mark, .user-highlight { background-color: #fef08a; color: #111827; }
+    u, .underline-text { text-decoration: underline; }
+    s, .strike-text { text-decoration: line-through; }
+    /* Modal styling retained */
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      padding: 16px;
+      z-index: 999;
+    }
+    .modal-content {
+      width: 100%;
+      max-width: 720px;
+      background: #020617;
+      color: #e5e7eb;
+      border-radius: 18px;
+      padding: 16px 16px 14px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8);
+    }
+    .modal-content h3 {
+      margin-bottom: 8px;
+      font-size: 16px;
+      font-weight: 500;
+    }
+    #editArea, #feedbackArea {
+      width: 100%;
+      min-height: 200px;
+      max-height: 60vh;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(148, 163, 184, 0.6);
+      background: #020617;
+      color: #e5e7eb;
+      font-size: 14px;
+      resize: vertical;
+      outline: none;
+    }
+    #editArea:focus, #feedbackArea:focus {
+      border-color: #818cf8;
+      box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.7);
+    }
+    .modal-actions {
+      margin-top: 10px;
+      display: flex;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .small-btn {
+      padding: 7px 14px;
+      border-radius: 999px;
+      border: none;
+      font-size: 12px;
+      cursor: pointer;
+      color: white;
+    }
+    .small-save { background: #22c55e; }
+    .small-cancel { background: #ef4444; }
+    @media (max-width: 480px) {
+      h1 { font-size: 18px; }
+      .subtitle { font-size: 11px; }
+      .essay-card { font-size: 12px; }
+      .modal-content { padding: 14px; }
+      #editArea, #feedbackArea { min-height: 170px; }
+    }
+    /* ================== New Year decorations ================== */
+    /* Wrapper around the name input so the stocking can be positioned nicely */
+    .name-wrapper { position: relative; }
+    .ny-icon {
+      position: absolute;
+      top: 50%;
+      right: 10px;
+      transform: translateY(-50%);
+      font-size: 22px;
+      line-height: 1;
+      display: none;
+      pointer-events: none;
+    }
+    /* Show icons when New Year mode is on */
+    body.newyear-mode .ny-icon { display: block; }
+    /* Add extra padding to the input when the icon is visible */
+    body.newyear-mode .name-wrapper input[type="text"] { padding-right: 45px; }
+    /* Hide legacy image stickers */
+    .btn .btn-sticker,
+    body.newyear-mode .btn .btn-sticker,
+    .essay-card .card-sticker,
+    body.newyear-mode .essay-card .card-sticker {
+      display: none !important;
+    }
+
+    /* Additional rule to hide any image inside buttons and essay cards (fallback for stubborn base64 icons) */
+    .btn img {
+      display: none !important;
+    }
+    .essay-card .card-sticker {
+      display: none !important;
+    }
+    /* Emoji stickers for buttons */
+    .btn .emoji-sticker {
+      position: absolute;
+      /* Position the emoji inside the button to be fully visible */
+      top: 50%;
+      right: 12px;
+      transform: translateY(-50%);
+      font-size: 24px;
+      line-height: 1;
+      pointer-events: none;
+    }
+    /* Emoji sticker for essay cards */
+    .essay-card .emoji-card-sticker {
+      position: absolute;
+      /* Position near bottom‑right corner but fully inside the card */
+      bottom: 8px;
+      right: 8px;
+      font-size: 22px;
+      line-height: 1;
+      /* Allow clicking/tapping on the emoji sticker */
+      pointer-events: auto;
+      cursor: pointer;
+    }
+
+    /* Bubble that displays the custom gift message when the 🎁 sticker is clicked. */
+    .gift-message {
+      position: absolute;
+      /* Display above the sticker */
+      bottom: 36px;
+      right: 8px;
+      background: var(--card-bg);
+      color: var(--text-main);
+      border-radius: 8px;
+      padding: 4px 8px;
+      font-size: 12px;
+      white-space: nowrap;
+      opacity: 0;
+      transform: scale(0.8);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+      pointer-events: none;
+      z-index: 10;
+    }
+    /* When visible, the gift message fades and scales into view. */
+    .gift-message.show-gift-message {
+      opacity: 1;
+      transform: scale(1);
+      pointer-events: auto;
+    }
+    /* Optional pulse animation for emphasis */
+    @keyframes gift-pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    .gift-message.pulse {
+      animation: gift-pulse 1s ease-in-out infinite;
+    }
+
+    /* Styling for the gift message input inside the edit modal */
+    .gift-message-edit {
+      margin-top: 10px;
+    }
+    .gift-message-edit label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .gift-message-edit input {
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 12px;
+      border-radius: 6px;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      background: transparent;
+      color: var(--text-main);
+      outline: none;
+    }
+    /* Snow container spans only the header region; pointer‑events none ensures typing is unaffected */
+    .snow-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 160px;
+      overflow: hidden;
+      pointer-events: none;
+      display: none;
+      z-index: 1;
+    }
+    body.newyear-mode .snow-container { display: block; }
+    .snowflake {
+      position: absolute;
+      top: -10px;
+      color: #ffffff;
+      opacity: 0.9;
+      user-select: none;
+      will-change: transform;
+    }
+    /* Define individual flakes with varying animation durations, delays and sizes */
+    @keyframes fall {
+      0% { transform: translateY(0) rotate(0deg); }
+      100% { transform: translateY(180px) rotate(360deg); }
+    }
+    .snowflake:nth-child(1) { left: 5%; font-size: 12px; animation: fall 7s linear infinite; animation-delay: 0s; }
+    .snowflake:nth-child(2) { left: 15%; font-size: 16px; animation: fall 10s linear infinite; animation-delay: 2s; }
+    .snowflake:nth-child(3) { left: 25%; font-size: 10px; animation: fall 8s linear infinite; animation-delay: 4s; }
+    .snowflake:nth-child(4) { left: 35%; font-size: 14px; animation: fall 9s linear infinite; animation-delay: 1s; }
+    .snowflake:nth-child(5) { left: 45%; font-size: 13px; animation: fall 6s linear infinite; animation-delay: 3s; }
+    .snowflake:nth-child(6) { left: 55%; font-size: 11px; animation: fall 8s linear infinite; animation-delay: 5s; }
+    .snowflake:nth-child(7) { left: 65%; font-size: 15px; animation: fall 10s linear infinite; animation-delay: 0.5s; }
+    .snowflake:nth-child(8) { left: 75%; font-size: 12px; animation: fall 7s linear infinite; animation-delay: 2.5s; }
+    .snowflake:nth-child(9) { left: 85%; font-size: 14px; animation: fall 9s linear infinite; animation-delay: 1.5s; }
+    .snowflake:nth-child(10) { left: 95%; font-size: 11px; animation: fall 8s linear infinite; animation-delay: 3.5s; }
+    /* Rain effect styles */
+    .rain-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 160px;
+      overflow: hidden;
+      pointer-events: none;
+      display: none;
+      z-index: 1;
+    }
+    /* Show raindrops when in rain-mode */
+    body.rain-mode .rain-container { display: block; }
+    .raindrop {
+      position: absolute;
+      top: -10px;
+      color: #ffffff;
+      opacity: 0.8;
+      user-select: none;
+      will-change: transform;
+      /* Use the same falling animation but without rotation */
+      animation: rain-fall linear infinite;
+    }
+    /* Define the rain drop fall animation */
+    @keyframes rain-fall {
+      0% { transform: translateY(0); opacity: 0.8; }
+      100% { transform: translateY(180px); opacity: 0.1; }
+    }
+    /* Assign positions and timings for individual drops */
+    .raindrop:nth-child(1) { left: 5%; font-size: 12px; animation-duration: 4s; animation-delay: 0s; }
+    .raindrop:nth-child(2) { left: 15%; font-size: 16px; animation-duration: 5s; animation-delay: 1s; }
+    .raindrop:nth-child(3) { left: 25%; font-size: 10px; animation-duration: 3s; animation-delay: 2s; }
+    .raindrop:nth-child(4) { left: 35%; font-size: 14px; animation-duration: 4.5s; animation-delay: 0.5s; }
+    .raindrop:nth-child(5) { left: 45%; font-size: 13px; animation-duration: 3.5s; animation-delay: 1.5s; }
+    .raindrop:nth-child(6) { left: 55%; font-size: 11px; animation-duration: 4s; animation-delay: 2.5s; }
+    .raindrop:nth-child(7) { left: 65%; font-size: 15px; animation-duration: 5s; animation-delay: 0.75s; }
+    .raindrop:nth-child(8) { left: 75%; font-size: 12px; animation-duration: 4s; animation-delay: 1.25s; }
+    .raindrop:nth-child(9) { left: 85%; font-size: 14px; animation-duration: 4.5s; animation-delay: 1.75s; }
+    .raindrop:nth-child(10) { left: 95%; font-size: 11px; animation-duration: 3.5s; animation-delay: 2.25s; }
+
+    /* Weather toggle button styling */
+    .weather-btn {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(45deg, #8e2de2, #4a00e0);
+      border: none;
+      color: #fff;
+      font-size: 14px;
+      margin-left: 8px;
+      cursor: pointer;
+      transition: background 0.3s, transform 0.2s;
+    }
+    .weather-btn:hover {
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body class="neon-theme newyear-mode">
+  <!-- Vocabulary and Chat features have been removed -->
+  <div class="container">
+    <div id="essaySection" class="inner">
+      <h1>✨ Pangeya Essay Platform</h1>
+      <div class="subtitle">Write, save and print essays. Teachers can leave feedback with a secret key.</div>
+      <!-- Snow effect overlay (falls within header area) -->
+      <div class="snow-container" aria-hidden="true">
+        <div class="snowflake">❆</div>
+        <div class="snowflake">❅</div>
+        <div class="snowflake">❆</div>
+        <div class="snowflake">❄</div>
+        <div class="snowflake">❅</div>
+        <div class="snowflake">❆</div>
+        <div class="snowflake">❅</div>
+        <div class="snowflake">❄</div>
+        <div class="snowflake">❆</div>
+        <div class="snowflake">❅</div>
+      </div>
+      <!-- Rain effect overlay (falls within header area) -->
+      <div class="rain-container" aria-hidden="true">
+        <div class="raindrop">💧</div>
+        <div class="raindrop">💧</div>
+        <div class="raindrop">💧</div>
+        <div class="raindrop">💧</div>
+        <div class="raindrop">💧</div>
+        <div class="raindrop">💧</div>
+        <div class="raindrop">💧</div>
+        <div class="raindrop">💧</div>
+        <div class="raindrop">💧</div>
+        <div class="raindrop">💧</div>
+      </div>
+      <!-- Theme switcher: Neon, Light and Dark -->
+      <div class="theme-switcher">
+        <button class="theme-btn active" id="neonTheme">Neon</button>
+        <button class="theme-btn" id="lightTheme">Light</button>
+        <button class="theme-btn" id="darkTheme">Dark</button>
+        <!-- Weather toggle button: click to switch between snow and rain -->
+        <button class="weather-btn" id="weatherToggle" onclick="toggleWeather()" title="Toggle snow/rain">🌧</button>
+      </div>
+      <!-- Name input wrapped so the tree emoji can sit inside -->
+      <label for="name">Your name</label>
+      <div class="name-wrapper">
+        <input id="name" type="text" placeholder="Enter your name" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <!-- Use an emoji for the name icon instead of an image -->
+        <span class="ny-icon">🎄</span>
+      </div>
+      <!-- Essay textarea -->
+      <label for="essay">Write your essay</label>
+      <textarea id="essay" placeholder="Write your essay..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+      <!-- Primary actions with New Year stickers (tree, gift, Santa) -->
+      <button class="btn btn-primary" id="submitBtn">Submit
+        <span class="emoji-sticker">🎉</span>
+        <img src="data:image/png;base64,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" alt="Christmas tree" class="btn-sticker">
+      </button>
+      <button class="btn btn-secondary" id="pdfBtn">Download PDF
+        <span class="emoji-sticker">🎁</span>
+        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAQ+UlEQVR4nJVa668d1XVfa+29Z87z3ut77esnxgZhm2dICy2kTSqUdn8TYqBAe6YkpVKqATiSqTs/47u3XGbMdO2fc72oJMmbBf7HzVwznIEnRi3n3O+c+z8zzvuuuTFNiW9te2p7jZCUiGKGZV2hZkZkxkbmZhpIaoTSmMuczQYY44Q+IqRoSaCtCj1AW5pKa4oymSrp6iQit0HoAGkKzPPDCTAiBAuyCEE2KKiG9tBZsYIOZ+XE+3cMzfMuCRnISWW9x6Dk2xU8EBHJxAkwppRDNhTuFowTiQmko0GyIUYjIBEoIXL8QyZnGk3MYzlOzSVVANy5VVYoMyIM8ksIlkIpBVS5CTsa0HEhLVijkQ52iFiISkOWshWvfzjTP+kGejNQwcKYV7RV1nCOWkt2xQ6lLZPTelBSRkSoV3y3zTWhtPAEIzUVZw+gZBNwj7JOD0rAyG0BVkpMeMeun1eyvHPvVgLrVZC2eDkKpzFsTRuwt5IcZ4nO4zNYl5MOR5Q5wkOy+Xj2bA+4t99r0SePyuEY+SnWvRR9Hf1pBBRMvyDGReIxTtZMD9QzZTxCkmtQnWAZqwYBPfdZ8Uo6UZTiHRTN8e7Z1h3KX9Er6n/l3DXTLX9WLDjSZBKNwDACnI+AvgqVj/GGetM6PQpmoKqyPJSar8pFZFkl4tIw1pY4IjJnHCRaYK8j7CYRJ0wj7LjMhjC9xzzEHCTrdQ26STpxjMl3zZv13gUcMXnfLvvLZbVfmxoZMc+0EIq6EjE8jnNXXzzTktIiayGBwF9APGVSMrW4GI5xP9ZU7SK4TmmIAbtT62KjRq5WS7wb68yZSRHeY9ZkREhQ73G7zKgmK6wgULqO9lFBkGwj7VaM+vdIp8wz3AEbKfcAl0ECPsUWSBGShDYjIqZy/hlJEsqFhxxChzQ0bptag0C0BwTyFhaYIA5LiHzJmMr9FJJSdyWZpS07zV3gYCKIjxSK1Btlpo4l6oB0SLBKVdKK0iaNBI1AxhFMLJSIsG6og43VKOI4oYsSNpnnjH4jiIbZpIe+u34ps3pa1Op+fbf/8cw9faeT8/x+fzv82SpJkZt2G4d2JsNN5nyoZp5S+WZZ2kiZAatSIt6pIz8yVJLwQ9CSkCwpQAMeORxFWLOcMJEIYhDhKQYRBf0oWhrF+aV+JLph7ySb9xDeP/cXp5/674ry5XfkebDnPtXMgQrBzSNKCazmXGVFMUiHSjlIg5C6Ai3ABfQ0RyB5DoUj1OCDvlrTn2e6qEuMDCrk/+evYDcqlJJmuxJMgDM3oQQ6RDIKUeY9wgaMos8MkklCRDWZbvWtn6YxWrzy0VVx5yFAwowc3z6dLQUXWLW2j6j1E7eqabN1DQZ5s6Z9x8CvbbzteqMomAg8hN92XqoZJCHDcIw3edXteTnPYFf6L6G/RtzyPl2DeRZYgUG2TKZIbQkUXZOihzLVHUZCsviRlRreR4FgUFfXRFs69zpZD1YBHRYs2iKkAhplSDBWdczPsU7JQsIUm0CqKAUxnSFWP6BRZZXiCTJhm0EehDRxwRECI30OqAOMthHiyEnIQDMGmim7VjUJCoZCqkWmhm2Y0iKbSTX/t791efDCB97NydLRvYc6s+OPP9EHg1fRgwltS9CYPAG9AMdSA3kom2phHFPe7mpMwYmqAKInoijCzMltdHIvWu6frbMXXTiF0axfHdLammxvjGZFAYcWbQeFxR9FAY0Pi6G72q8w7Ib8DrB3iNEOLgdxnrSJpP+izHlfyEMOE7MlQz1VvgFFmVk9y4upqjKT1YmZ6NmncfKFFoYfWzxk8MCiKJodIfBS9Q3EyAn5khKOkL4mRnMSxSSds61w62kCZLV3h9YI4uCUYIwAbZjiMtUiwoU7jEhSefFk5pef6KJljZ6BdYruLMRSipKiWTwIzMaSf9XgKHfBxgwrUPvA24PODy9/zu/tDxxO7Xfns5Jno9Z889JplLKrvpnEoqJvGG6b1/7pzz5mJmQJ+KF7RcPHpJmUVu1k5JXeRjjXCf2paWbJ1PzX8QZTXkMBOcBEm0SmocZ8w4dXPAyXexKpXzO4dzrT5s+fn8zdM3gmWQ4Q1AGIQ1QTULtgIFUYEm1rSATFooly9ezy4qyke4MTN3AIeEKVTnVsTRBBssSiMEfp11xVmwrqQiFsFey+YN5coE6uqQsMUGKm/Rhm/3ki8yj/24vw0d+uhqOlBKOFAMJLmTZqjW3VKJmikkSbDzJyL6MzB4oWKh41Z4vTMpJYu4yUwzAgTjL2m++/Hzo5dJLfbfy6ztJMkO33Lq6kzvlkkunfckyrDRpbuaeF5ilSG8wZNCTXEBy2agS2XNeCXty4Ye6RMIvVhIhNv2TTYNULQVaxh8zbSuI45gd5EBSwDVaqJumDCvTfQEAYhPmnMqZ9ajLgIpmVtaG501MevfLOiGRF6Hms21mY9QBn/YBP7zM/S6OWu1d+cIomcIENMZi4XaTOMRTXZE6CFeRHW2CSVhi1gBCpd3/s/PB1I1IKsyCJDdcpVeZEbPNGo7vrLN+2SasvqqZ0HGUYYtQJtQkQRmc5FJHLwhlvAaJwTHnJNuzcJIk7tDdA/QpX79+ZE4y+hxM7crXkwfMt0kfhoHBMWZuOMoHWfA4tn99piI8dNz6Bbfz85TtOeMX9/Mul2978D44zNJAzUibJ2S2CxCEiXpfwyJNtLGZLwqUiTXg1MMZppjaTYqWkkgiqQkO4REcC7Top52ZZUyftf8Edbu/5OyWYPXOtvmsPFye8PEPe90TjhnHuQ7/ykXk57roDzC5RUozzUlEVP5tOa7sg+2Eo+2s3Z1pzjp61hb4I4zW7XYrdbWrdZ0joATygdaXmvDAUQQhIbmRq3fi2IO9fRu+do3Hj5kvPnwxBeoMrE9L1RGmwMcEKfAYXjqa5XGqXL9KEoYP8GZvm2P6BNzi9sT2cJB74hKDC1rIarVivUsnMjOO1c8kRT3z1I+eAjLxBPa21FVta24u75ZqWtj51NdXZ7Ky9clKTZ+R5IeYBrBapLzwCHHGmHt/ZVzdn2u4uVVUusSoT12osz7v7W3Zbb3z8/XJFNKlWokVKfH8xt5REvRPBjOv3y7L9neOuy++w4v5WtLSyyRoN1vLFpsw/EAnTUA8mogYutAAqIC5QuVGpZBdW4xhcs5yX0JiczFeREqtM9SmpB7esAkqCjnEMIfrjGkEmmgOQ6k4ye/sVkTaczy6eN0quu0pZ9tNUGrjjFQJUcBHBoyQYp0zGpgeG7AtK1+OfSnCPYuMDhOZtZZG8c/MNv3/wN4OBzyZZ8klZ2HIrvEiCc0CuMkMhlsrvudmT0OUzSw8LCx2+JlmtHRDzSTpQJmGMJGNbKYeLJacbtDQPG3nvzoRHvjEvXdm9k5mXdO96Q5LbHpKZcUVIQI4yEIMWnkci5zS1yWCt9zaPZLckSMyvrgM0BT4kfUQiHnjqtr1iFXevBh7qrqdRqIGLQrKePd1pVd17fz1cbWttdNVTZn6IctCjo7Y3dZ3Wt7f35rNzbrtZqTU1hDJi8rLWBWDC0u9m/081QESAKncRajJMYgoS5WT4J8PpMZKuPdE/60gsNN0l3rYX73xuA2AvJo8F1oXi1GUEsuDKEk0JhrvSkk0iMxlrlzaRLvtX7TnmDL6fI082abWvvmx3WE0jVWvhuRHGv100QTzOCAwwkMv+OyB0WUNLKZQ9fsxks2EWUAn1mAvz20CH311MX9ov97x5uV8uT3Vc79uOXucnyrapf2y7ITbge67apetTQYo+Bl9qXGvspaBshANXlmgz68n2S9UCRVq0CeJ8t51y3uLZZ4R3iPr7C0p9mVOu1xqRAST0c5p7u9xKyh4Lr2gCxXLm9zhu7NNKobFGf/e9fs9Kc9pH/kSKJmM02VQCByu1y9BlFuSkHLBbP+PBBlVLkCI3ZYHaFnk6K7MkqbWqA0yZwhzZFETMYvTkncE8ZaWO6oDu0EkC5bxoSFSWjdltp++Or1ZzUvzvOFKnvwWmpae/fVDYfPhGaN5A2iWU1g9u7yvW6L//Tl75xfupj/TqLHmF1UhCrUCpoFEdlaSvX+Opl57w70745JVAaT4nzPEtlBZSE74AkSrLDJQKaYkkYSQJKTZGoou2qtr/dG+Oz982xY2H/Z9IXblXf3n/HwWufXsJjDAEu9fKjAhwM277Qr8cDUqZwBha1Ukm5jGerflU7178uue5N1yfsr574rYxc3+/U0E5Pqpz9H/smAi9M7rZFWgHkGVU5nBBNdOfevv+G4GK+3q/WRYuV9vzPxcNbecUUl3E1sn3/942nnn1NohC9m9yCdvDyDSxMi+fmb9U/+ndX/3vOUhkp9nz3vbSNxCGGSVUC2BrIB9fmMw6GYALOfzkmb3Gdtw/swfSvwcwJp+c7RhnGOJp70jGTR2hiH9qnl2c3xEP9df9z7cvr9E9n32hUXpqlskQ/7PnwM/AcXf50ruvuf85Hzf+b/0d+f4Nr3rz4bx/+veq/bnpp/Vf773uEy7ZP/wp+9n+e8NwPbAATApGSBcnCgAAAAASUVORK5CYII=" alt="Gift" class="btn-sticker">
+      </button>
+      <button class="btn btn-teacher" id="teacherToggle">Teacher Login
+        <span class="emoji-sticker">🎅</span>
+        <img src="data:image/png;base64,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" alt="Gift" class="btn-sticker">
+      </button>
+      <!-- Hidden teacher panel revealed when logging in -->
+      <div class="teacher-panel" id="teacherPanel">
+        <input id="teacherKey" type="text" placeholder="Enter teacher key" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <button class="btn btn-teacher btn-enter" id="teacherEnter">Enter</button>
+      </div>
+      <!-- Essays list heading -->
+      <div class="section-title">
+        <span class="icon">🎄</span>
+        <span>All Essays</span>
+      </div>
+    <!-- Search bar for finding essays by author name -->
+    <div class="essay-search-controls">
+        <input id="essaySearch" type="text" placeholder="Search essays...">
+    </div>
+      <div class="essays-list" id="essaysList"></div>
+    </div> <!-- end of essaySection -->
+
+    <!-- Chat section -->
+    <div id="chatSection" class="chat-wrapper">
+      <div class="chat-header">
+        <div class="chat-title">🤖 PangeyaAI</div>
+        <div id="chatCredit" class="chat-credit-badge"></div>
+      </div>
+      <div id="chatMessages" class="chat-body"></div>
+      <!-- Typing animation shown while waiting for a reply -->
+      <div id="typingIndicator" class="typing hidden"><span></span><span></span><span></span></div>
+      <div class="chat-input-area">
+        <input id="chatInput" type="text" placeholder="Ask PangeyaAI..." autocomplete="off">
+        <button id="chatSendBtn" class="send-btn" type="button">➤</button>
+        <button id="chatClearBtn" class="clear-btn" type="button">🗑</button>
+      </div>
+      <div class="chat-disclaimer">Type "please" three times consecutively to receive 13 extra messages.</div>
+    </div>
+
+    <!-- Vocabulary and Chat sections removed -->
+  </div>
+  <!-- Snow now always falls; removed toggle button -->
+  <!-- Edit Essay Modal -->
+  <div class="modal" id="editModal">
+    <div class="modal-content">
+      <h3>Edit essay</h3>
+      <!-- toolbar for text formatting -->
+      <div class="toolbar">
+        <button class="icon-btn" title="Highlight Text" onclick="highlightSelection()">🖍</button>
+        <button class="icon-btn" title="Underline Text" onclick="underlineSelection()"><u>U</u></button>
+        <button class="icon-btn" title="Strikethrough Text" onclick="strikeSelection()"><s>S</s></button>
+      </div>
+      <div id="editArea" class="edit-area" contenteditable="true" spellcheck="false" autocorrect="off" autocapitalize="off"></div>
+
+      <!-- Custom gift message input for the 🎁 sticker -->
+      <div class="gift-message-edit">
+        <label for="giftMessageInput">Gift sticker message</label>
+        <input id="giftMessageInput" type="text" placeholder="Enter custom message or number">
+      </div>
+      <div class="modal-actions">
+        <button class="small-btn small-save" onclick="saveEdit()">Save</button>
+        <button class="small-btn small-cancel" onclick="closeEditModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+  <!-- Feedback Modal -->
+  <div class="modal" id="feedbackModal">
+    <div class="modal-content">
+      <h3>Add / edit teacher feedback</h3>
+      <div id="feedbackEssay" class="feedback-essay" contenteditable="true" spellcheck="false" autocorrect="off" autocapitalize="off"></div>
+      <div class="toolbar">
+        <button class="icon-btn" title="Highlight Text" onclick="highlightSelection()">🖍</button>
+        <button class="icon-btn" title="Underline Text" onclick="underlineSelection()"><u>U</u></button>
+        <button class="icon-btn" title="Strikethrough Text" onclick="strikeSelection()"><s>S</s></button>
+      </div>
+      <textarea id="feedbackArea" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+      <div class="modal-actions">
+        <button class="small-btn small-save" onclick="saveFeedback()">Save</button>
+        <button class="small-btn small-cancel" onclick="closeFeedbackModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+  <!-- About / Info Modal -->
+  <div class="modal" id="infoModal">
+    <div class="modal-content">
+      <h3>Author Information</h3>
+      <div style="font-size:14px; line-height:1.6; white-space:pre-wrap;">👤 Developed by: Maqsudjon Polatov
+Creator of:
+• Pangeya Essay Platform
+• Uzglidex Marketplace
+• 37P.AI automated tools
+• NubAI medical assistant
+• Matsumi music project
+
+📌 Support development
+If you would like to support future updates and improvements,
+you can send a donation to the following card:
+
+💳 9860 6004 0548 1208
+
+Or pay via QR:</div>
+      <img src="donation_qr.png" alt="Donation QR Code" class="donation-qr" onerror="this.style.display='none'">
+      <p style="font-size:13px; margin-top:12px; color:var(--text-muted);">Press <strong>Ctrl + `</strong> again to close this window.</p>
+      <div class="modal-actions">
+        <button class="small-btn small-cancel" onclick="toggleInfoModal()">Close</button>
+      </div>
+    </div>
+  </div>
+  <!-- User Guide Modal -->
+  <div class="modal" id="guideModal">
+    <div class="modal-content">
+      <h3>User Guide</h3>
+      <h4 style="margin-top:10px; font-size:15px;">For Students</h4>
+      <p style="font-size:13px; margin-bottom:8px;">1. Enter your name in the <em>Your name</em> field.</p>
+      <p style="font-size:13px; margin-bottom:8px;">2. Write your essay in the <em>Write your essay</em> box.</p>
+      <p style="font-size:13px; margin-bottom:8px;">3. Click <strong>Submit</strong> to save your essay to the cloud.</p>
+      <p style="font-size:13px; margin-bottom:8px;">4. You can edit your essay by clicking the <strong>Edit</strong> button next to it.</p>
+      <p style="font-size:13px; margin-bottom:8px;">5. To download your essay as a PDF, click <strong>Download PDF</strong>.</p>
+      <h4 style="margin-top:14px; font-size:15px;">For Teachers</h4>
+      <p style="font-size:13px; margin-bottom:8px;">1. Enter the secret teacher key in the <em>Teacher Key</em> field and click <strong>Enter</strong> to access teacher mode.</p>
+      <p style="font-size:13px; margin-bottom:8px;">2. Once in teacher mode, you can edit any essay, highlight important sections, underline useful phrases, or strike through errors.</p>
+      <p style="font-size:13px; margin-bottom:8px;">3. You can also add or edit feedback by clicking <strong>Add/Edit Feedback</strong> next to an essay.</p>
+      <p style="font-size:13px; margin-bottom:8px;">4. The teacher key is confidential. If you need the key, please contact <strong>Maqsudjon Polatov</strong> personally to request it.</p>
+      <p style="font-size:13px; margin-bottom:8px;">Press <strong>Ctrl + ;</strong> again to close this window and return to the platform.</p>
+      <div class="modal-actions">
+        <button class="small-btn small-cancel" onclick="toggleGuideModal()">Close</button>
+      </div>
+    </div>
+  </div>
+  <!-- Include jsPDF from CDN for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- Main application script; imported modules from Firebase remain unchanged.  Additional
+       functions implement the new Glass theme, New Year decorations and toggle logic.
+       The Pangeya theme code and related event handlers have been removed. -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-analytics.js";
+    import {
+      getFirestore,
+      collection,
+      addDoc,
+      getDocs,
+      doc,
+      updateDoc,
+      deleteDoc,
+      getDoc,
+      setDoc
+    } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+
+    // Constants
+    const TEACHER_KEY = 'CTNLC';
+    let teacherMode = false;
+    let currentEditId = null;
+    let currentFeedbackId = null;
+
+    // =====================================================================
+    // Global state and helpers for essay rendering
+    // ---------------------------------------------------------------------
+    // A counter to track the most recent essay fetch. Each call to
+    // renderEssays() increments this value. When an async fetch resolves,
+    // the render only proceeds if the captured requestId matches the global
+    // essayRequestCounter. This prevents stale data from overwriting
+    // newly fetched results when multiple renders are triggered in quick
+    // succession (for example, switching themes or performing searches).
+    let essayRequestCounter = 0;
+    // Holds the latest full list of essays retrieved from Firestore.  All
+    // filtering operations operate on this array to avoid mixing results
+    // from different fetches.
+    let allEssays = [];
+
+    // Counter and global state for vocabulary requests. Similar to essays,
+    // these help avoid stale renders when multiple search/filter operations
+    // occur rapidly. Each call to renderVocab increments vocabRequestCounter
+    // and stores fetched items in allVocab.
+    let vocabRequestCounter = 0;
+    let allVocab = [];
+
+    // Global state for chat messages.  chatHistory holds an array of
+    // messages exchanged with the AI.  Each message is an object with
+    // a 'role' (either 'user' or 'assistant') and a 'content' string.
+    let chatHistory = [];
+    // Counter to guard against stale AI responses.  Each call to
+    // sendChatMessage() increments this value.  When an API response
+    // arrives, it only updates the UI if the captured request ID matches
+    // the latest chatRequestCounter.
+    let chatRequestCounter = 0;
+    // The API key is not stored on the client.  All AI requests are proxied via
+    // backend endpoints where the key is securely managed.
+
+    // Endpoints for serverless functions hosted on Vercel.  The chat endpoint proxies
+    // user messages to OpenAI and returns a reply.  The essay feedback
+    // endpoint evaluates a single essay and returns band score and comments.
+    const CHAT_ENDPOINT = 'https://pangeya-ai.vercel.app/api/chat';
+    const FEEDBACK_ENDPOINT = 'https://pangeya-ai.vercel.app/api/essay-feedback';
+
+    // -----------------------------------------------------------------
+    // Local storage helpers for chat credits and feedback usage
+    // -----------------------------------------------------------------
+    function getChatLimit() {
+      const val = localStorage.getItem('pangeya_chat_limit');
+      return val ? parseInt(val, 10) : 13;
+    }
+    function setChatLimit(val) {
+      localStorage.setItem('pangeya_chat_limit', String(val));
+    }
+    function getPleaseCount() {
+      const val = localStorage.getItem('pangeya_please_count');
+      return val ? parseInt(val, 10) : 0;
+    }
+    function setPleaseCount(val) {
+      localStorage.setItem('pangeya_please_count', String(val));
+    }
+    function getFeedbackUsed() {
+      return localStorage.getItem('pangeya_feedback_used') === 'true';
+    }
+    function setFeedbackUsed(val) {
+      localStorage.setItem('pangeya_feedback_used', val ? 'true' : 'false');
+    }
+    // Generate or retrieve a unique identifier for this user.  This value is
+    // stored in localStorage and used by the backend to scope chat and
+    // essay feedback requests.  If not present, a new ID is generated.
+    function getUserId() {
+      let id = localStorage.getItem('pangeya_user_id');
+      if (!id) {
+        id = 'user-' + Math.random().toString(36).substring(2, 10);
+        localStorage.setItem('pangeya_user_id', id);
+      }
+      return id;
+    }
+    // Display remaining chat credits to the user.
+    function updateChatCredit() {
+      const creditEl = document.getElementById('chatCredit');
+      if (creditEl) {
+        creditEl.textContent = 'Chat credits: ' + getChatLimit();
+      }
+    }
+
+    // System prompt defining PangeyaAI's persona and guidelines.  This
+    // prompt instructs the assistant to behave like an IELTS examiner and
+    // produce high‑quality essays according to official band descriptors
+    // while avoiding informal language or generic responses.  It also
+    // contains restrictions and capabilities specific to the PangeyaAI
+    // brand.  The prompt should remain unchanged to ensure consistent
+    // behavior across conversations.
+    const SYSTEM_PROMPT = `You are PangeyaAI, a professional AI assistant designed specifically to help users prepare for the IELTS Academic and General Training Writing exams.
+
+Your primary responsibility is to assist users with IELTS Writing Task 1 and Task 2 by producing high-quality, band 7.0–9.0 level essays that strictly follow the official IELTS Band Descriptors:
+• Task Response / Task Achievement
+• Coherence and Cohesion
+• Lexical Resource
+• Grammatical Range and Accuracy
+
+You must always think and respond from the perspective of an IELTS examiner.
+
+⸻
+
+Writing Standards (Mandatory)
+• Use formal, academic English only
+• Follow a clear and logical paragraph structure:
+  • Introduction
+  • Body Paragraph 1
+  • Body Paragraph 2
+  • (Conclusion where appropriate)
+• Apply strong topic sentences, clear explanations, and relevant examples
+• Maintain logical flow using appropriate cohesive devices (e.g. however, moreover, in contrast, as a result)
+• Use a wide range of complex and compound sentence structures, including:
+  • Relative clauses
+  • Conditionals
+  • Passive voice
+  • Concession structures (although, despite, in spite of)
+
+⸻
+
+Lexical Requirements
+• Use IELTS-appropriate topic vocabulary
+• Apply natural collocations and precise word choices
+• Avoid repetition and unnatural or overly memorized expressions
+• Maintain clarity and academic tone at all times
+
+⸻
+
+Strict Restrictions
+• Do NOT provide short, generic, or underdeveloped answers
+• Do NOT go off topic or include irrelevant ideas
+• Do NOT mention being an AI or language model
+• Do NOT produce low-band (Band 5–6) structures or language
+• Do NOT use informal language or contractions
+
+⸻
+
+Additional Capabilities
+
+When required, you may:
+• Evaluate essays and estimate an IELTS band score
+• Explain strengths and weaknesses clearly
+• Rewrite or improve essays to a higher band level
+• Adapt writing to different task types:
+  • Opinion (Agree/Disagree)
+  • Discussion
+  • Problem–Solution
+  • Advantages–Disadvantages
+
+⸻
+
+Brand Identity
+
+You represent PangeyaAI, the intelligent core of a modern and reliable IELTS preparation platform. Every response must be accurate, structured, exam-oriented, and designed to help users achieve the highest possible IELTS score.`;
+
+    /**
+     * Render the chat messages into the chatMessages container.  Clears
+     * any existing content and builds message bubbles for each entry
+     * stored in chatHistory.  User messages are right‑aligned with an
+     * accent gradient, while assistant messages are left‑aligned with a
+     * muted background.  After rendering, the container scrolls to the
+     * bottom to show the latest message.
+     */
+    function renderChat() {
+      const container = document.getElementById('chatMessages');
+      if (!container) return;
+      container.innerHTML = '';
+      chatHistory.forEach(msg => {
+        const div = document.createElement('div');
+        div.classList.add('chat-message');
+        div.classList.add(msg.role === 'user' ? 'user' : 'assistant');
+        // If this message contains an image, display the image instead of text.
+        if (msg.imageData) {
+          const img = document.createElement('img');
+          img.src = msg.imageData;
+          img.alt = 'User image';
+          div.appendChild(img);
+          // Optionally include any accompanying text below the image
+          if (msg.content) {
+            const p = document.createElement('p');
+            p.textContent = msg.content;
+            div.appendChild(p);
+          }
+        } else {
+          // Text message
+          div.textContent = msg.content;
+        }
+        container.appendChild(div);
+      });
+      // Scroll to bottom to show the latest messages
+      container.scrollTop = container.scrollHeight;
+    }
+
+    /**
+     * Show the chat section and hide the essay/vocab sections.  When switching
+     * to the chat, ensure the chat history is rendered and the scroll is
+     * positioned at the bottom.
+     */
+    function switchToChat() {
+      const essaySection = document.getElementById('essaySection');
+      const vocabSection = document.getElementById('vocabSection');
+      const chatSection = document.getElementById('chatSection');
+      if (essaySection) essaySection.style.display = 'none';
+      if (vocabSection) vocabSection.style.display = 'none';
+      if (chatSection) {
+        chatSection.style.display = 'block';
+        renderChat();
+      }
+
+    // Close switchToChat here (no nested functions)
+    }
+
+    /**
+     * Toggle between snow and rain effects.
+     * When the page is in snow mode (body has class newyear-mode), clicking
+     * the weather toggle button switches to rain mode (adding rain-mode and
+     * removing newyear-mode) and updates the button icon to a snowflake so
+     * the user can switch back.  When in rain mode, it does the opposite.
+     */
+    function toggleWeather() {
+      const body = document.body;
+      const toggleBtn = document.getElementById('weatherToggle');
+      if (body.classList.contains('rain-mode')) {
+        body.classList.remove('rain-mode');
+        body.classList.add('newyear-mode');
+        if (toggleBtn) toggleBtn.textContent = '🌧';
+      } else {
+        body.classList.remove('newyear-mode');
+        body.classList.add('rain-mode');
+        if (toggleBtn) toggleBtn.textContent = '❄';
+      }
+    }
+
+    /**
+     * Send the current input from the chat box to the OpenAI API.
+     * Adds the user's message to chatHistory and renders it immediately.
+     * Then performs a POST request to the chat API.  When a response
+     * arrives, verifies that it is not stale (matches the current
+     * chatRequestCounter) before updating chatHistory and re‑rendering.
+     */
+    async function sendChatMessage() {
+      const input = document.getElementById('chatInput');
+      if (!input) return;
+      const text = (input.value || '').trim();
+      if (!text) return;
+      const lower = text.toLowerCase();
+      // Retrieve current credits and please count
+      let credits = getChatLimit();
+      let pleaseCount = getPleaseCount();
+      // If user has no credits and message isn't "please", inform them and exit
+      if (credits <= 0 && lower !== 'please') {
+        chatHistory.push({ role: 'assistant', content: 'No chat credits left. Type "please" three times consecutively to receive 13 extra messages.' });
+        input.value = '';
+        renderChat();
+        updateChatCredit();
+        return;
+      }
+      // Add user message to history
+      chatHistory.push({ role: 'user', content: text });
+      input.value = '';
+      renderChat();
+      // Decrement a credit for every message (including "please")
+      credits -= 1;
+      // Handle "please" logic
+      if (lower === 'please') {
+        pleaseCount += 1;
+        if (pleaseCount >= 3) {
+          credits += 13;
+          pleaseCount = 0;
+          chatHistory.push({ role: 'assistant', content: 'You have been granted 13 extra chat credits. Remaining credits: ' + credits });
+          renderChat();
+        }
+        setChatLimit(credits);
+        setPleaseCount(pleaseCount);
+        updateChatCredit();
+        // Do not send "please" to the AI
+        return;
+      } else {
+        // Reset please count for any other message
+        pleaseCount = 0;
+        setPleaseCount(0);
+      }
+      // Update credits in storage
+      setChatLimit(credits);
+      updateChatCredit();
+      // Show typing indicator
+      const typingEl = document.getElementById('typingIndicator');
+      if (typingEl) typingEl.classList.remove('hidden');
+      // Increment request counter and capture id for this call
+      const myChatRequestId = ++chatRequestCounter;
+      try {
+        // Prepare the payload for the backend.  Send the system prompt and the
+        // current chat history (without images) so that the AI maintains context.
+        const userMessages = chatHistory
+          .filter(msg => !msg.imageData)
+          .map(msg => ({ role: msg.role, content: msg.content }));
+        const payload = {
+          message: text,
+          chatHistory: userMessages,
+          systemPrompt: SYSTEM_PROMPT,
+          model: chatHistory.some(m => m.imageData) ? 'gpt-4o' : 'gpt-3.5-turbo',
+          userId: getUserId()
+        };
+        const response = await fetch(CHAT_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (myChatRequestId !== chatRequestCounter) return;
+        const data = await response.json();
+        const assistantMsg = data && data.reply
+          ? data.reply.trim()
+          : (data && data.error ? data.error : 'Sorry, I could not get a response.');
+        chatHistory.push({ role: 'assistant', content: assistantMsg });
+        renderChat();
+      } catch (err) {
+        console.error('Chat error:', err);
+        if (myChatRequestId === chatRequestCounter) {
+          chatHistory.push({ role: 'assistant', content: 'Sorry, there was an error communicating with the AI.' });
+          renderChat();
+        }
+      } finally {
+        if (typingEl) typingEl.classList.add('hidden');
+      }
+    }
+
+    /**
+     * Handle the selection of an image file by the user. Reads the file
+     * as a Data URL, adds it to chatHistory as a user message with
+     * an imageData property, renders it immediately, and then sends
+     * the image to the OpenAI API for a response.
+     */
+function handleImageUpload() {
+      // Image upload and vision-based chat are no longer supported in this
+      // version of the platform.  This function intentionally does
+      // nothing to avoid referencing any OpenAI vision APIs from the
+      // client-side code.
+    }
+
+    /**
+     * Clear the current chat history.  Resets chatHistory and chatRequestCounter
+     * and re-renders the chat container to remove all messages.
+     */
+    function clearChat() {
+      chatHistory = [];
+      chatRequestCounter = 0;
+      renderChat();
+      updateChatCredit();
+    }
+
+    // The old getAIFeedback function has been removed.  Per‑essay AI feedback is handled by getEssayAIFeedback().
+
+    /**
+     * Safely convert various Firestore date representations into a Date
+     * object. Supports Firestore Timestamp objects, numeric timestamps,
+     * ISO strings or locale strings. If the value is invalid or missing,
+     * the Unix epoch (1970-01-01) is returned.
+     * @param {any} value
+     * @returns {Date}
+     */
+    function toDateSafe(value) {
+      try {
+        if (!value) return new Date(0);
+        // Firestore Timestamp object
+        if (typeof value === 'object' && value.seconds !== undefined) {
+          return new Date(value.seconds * 1000);
+        }
+        // Numeric timestamp (milliseconds)
+        if (typeof value === 'number') {
+          return new Date(value);
+        }
+        // Attempt to parse string formats
+        const parsed = Date.parse(value);
+        if (!isNaN(parsed)) {
+          return new Date(parsed);
+        }
+      } catch (err) {
+        console.warn('toDateSafe error for value', value, err);
+      }
+      return new Date(0);
+    }
+
+    /**
+     * Strip HTML tags from a string.  This helper extracts the text content
+     * from markup so that search queries can match plain text inside
+     * essays without being affected by embedded HTML tags or formatting.
+     * @param {string} html The HTML string to strip
+     * @returns {string} Plain text
+     */
+    function stripHtml(html) {
+      if (!html) return '';
+      // Create a temporary DOM element and assign the HTML to its innerHTML.
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      return tmp.textContent || tmp.innerText || '';
+    }
+
+    /**
+     * Format a Date into a consistent DD/MM/YYYY, HH:MM:SS string. This
+     * function centralises date formatting so that all dates displayed in
+     * the UI follow the same locale-independent format.
+     * @param {Date} date
+     * @returns {string}
+     */
+    function formatDate(date) {
+      const formatter = new Intl.DateTimeFormat('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+      return formatter.format(date);
+    }
+
+    // Firebase configuration (copied from the original)
+    const firebaseConfig = {
+      apiKey: "AIzaSyBnmbg7CyLki-M1E4rxPevJ741yTykliDA",
+      authDomain: "pangeya-essay.firebaseapp.com",
+      projectId: "pangeya-essay",
+      storageBucket: "pangeya-essay.appspot.com",
+      messagingSenderId: "783326121302",
+      appId: "1:783326121302:web:7d73c5110fb5682e5fdaf7",
+      measurementId: "G-0L1X6WHT1E"
+    };
+    // Initialize Firebase and Firestore
+    const app = initializeApp(firebaseConfig);
+    getAnalytics(app);
+    const db = getFirestore(app);
+    const essaysRef = collection(db, "essays");
+    // Reference to the vocabulary collection for storing words and definitions
+    const vocabRef = collection(db, "vocab");
+
+    // Reference to gift messages collection for storing per‑author sticker text
+    // Each document id corresponds to the essay author's name and stores a `message` field
+    // Example: { name: "John", message: "1-800" }
+    // Use helper functions below to get and set messages
+
+    /**
+     * Retrieve the custom gift message for a given author name. If no message is set,
+     * returns an empty string. Errors are silently caught and logged.
+     * @param {string} name
+     * @returns {Promise<string>}
+     */
+    async function getGiftMessage(name) {
+      if (!name) return '';
+      try {
+        const docRef = doc(db, 'giftMessages', name);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          const data = snap.data();
+          return data && data.message ? data.message : '';
+        }
+        return '';
+      } catch (err) {
+        console.error('Error fetching gift message for', name, err);
+        return '';
+      }
+    }
+
+    /**
+     * Save or update the custom gift message for a given author name.  Uses merge
+     * to preserve other fields if present.  This function does not return a value.
+     * @param {string} name
+     * @param {string} message
+     */
+    async function saveGiftMessage(name, message) {
+      if (!name) return;
+      try {
+        await setDoc(doc(db, 'giftMessages', name), { message: message }, { merge: true });
+      } catch (err) {
+        console.error('Error saving gift message for', name, err);
+      }
+    }
+
+    // Track the author name currently being edited so we know which gift message to update
+    let currentEditName = null;
+
+    /**
+     * Escape HTML special characters to prevent XSS when rendering content from
+     * Firestore.  Borrowed from the original site.
+     */
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    /**
+     * Render essays from Firestore into the list.  This function builds each
+     * essay card including word count and optional feedback.  Positioning is
+     * preserved from the original; we simply assign a class and rely on CSS for
+     * the New Year sticker on each card.
+     */
+    async function renderEssays(queryName = '', showLatestOnly = false) {
+      const container = document.getElementById('essaysList');
+      // Increment the request counter and capture this call's id.
+      const myRequestId = ++essayRequestCounter;
+      container.innerHTML = '';
+      const snapshot = await getDocs(essaysRef);
+      // If a more recent request has been made, abort this render.
+      if (myRequestId !== essayRequestCounter) {
+        return;
+      }
+      if (snapshot.empty) {
+        container.innerHTML =
+          '<div style="font-size:12px;color:var(--text-muted);padding:2px 2px 6px;">No essays yet. Write and submit your first essay!</div>';
+        allEssays = [];
+        return;
+      }
+      const docsArray = [];
+      snapshot.forEach(docSnap => {
+        docsArray.push({ id: docSnap.id, data: docSnap.data() });
+      });
+      // Update global allEssays state.
+      allEssays = docsArray;
+      const parseDateString = (str) => {
+        if (!str) return 0;
+        const parts = str.split(',');
+        const datePart = parts[0].trim();
+        const timePart = parts[1] ? parts[1].trim() : '';
+        let day, month, year;
+        if (datePart.includes('.')) {
+          [day, month, year] = datePart.split('.');
+        } else if (datePart.includes('/')) {
+          const dp = datePart.split('/');
+          if (parseInt(dp[0], 10) > 12) {
+            [day, month, year] = dp;
+          } else {
+            [month, day, year] = dp;
+          }
+        } else if (datePart.includes('-')) {
+          const dp = datePart.split('-');
+          if (dp[0].length === 4) {
+            [year, month, day] = dp;
+          } else {
+            [month, day, year] = dp;
+          }
+        } else {
+          return 0;
+        }
+        let hours = 0, minutes = 0, seconds = 0;
+        if (timePart) {
+          const tp = timePart.split(':');
+          hours = parseInt(tp[0], 10) || 0;
+          minutes = parseInt(tp[1], 10) || 0;
+          seconds = parseInt(tp[2], 10) || 0;
+        }
+        const y = parseInt(year, 10);
+        const m = parseInt(month, 10) - 1;
+        const d = parseInt(day, 10);
+        return new Date(y, m, d, hours, minutes, seconds).getTime();
+      };
+      // Optionally filter by author name if a search query was provided.
+      const qName = (queryName || '').toString().trim().toLowerCase();
+      let filteredArray = allEssays;
+      if (qName) {
+        // When a search query is provided, match it against the author's name
+        // and the plain text of the essay.  We strip HTML tags from the
+        // essay content so that search terms can match the visible text.
+        filteredArray = allEssays.filter(item => {
+          const nm = (item.data.name || '').toString().toLowerCase();
+          const essayText = stripHtml(item.data.essay || '').toLowerCase();
+          return nm.includes(qName) || essayText.includes(qName);
+        });
+      }
+      // Sort descending by timestamp/date using safe conversion
+      filteredArray.sort((a, b) => {
+        const tA = toDateSafe(a.data.timestamp ?? a.data.date).getTime();
+        const tB = toDateSafe(b.data.timestamp ?? b.data.date).getTime();
+        return tB - tA;
+      });
+      // If no search query and we only want the most recent essay, slice the array
+      if (!qName && showLatestOnly && filteredArray.length > 0) {
+        filteredArray = [filteredArray[0]];
+      }
+      for (const item of filteredArray) {
+        // Abort if this render is stale.  If a newer renderEssays() call
+        // has updated essayRequestCounter, we stop building to prevent
+        // mixing old and new data.
+        if (myRequestId !== essayRequestCounter) {
+          return;
+        }
+        const data = item.data;
+        const docId = item.id;
+        const card = document.createElement('div');
+        card.className = 'essay-card';
+        // Header with name and date
+        const header = document.createElement('div');
+        header.className = 'essay-header';
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'essay-name';
+        // Prefix the author's name with a tree emoji so that a 🎄 appears before every name
+        nameSpan.textContent = (data.name ? `🎄 ${data.name}` : '🎄 Unknown');
+        const dateSpan = document.createElement('span');
+        // Always compute and display the date using our helper functions.
+        const displayDate = formatDate(toDateSafe(data.timestamp ?? data.date));
+        dateSpan.textContent = displayDate;
+        header.appendChild(nameSpan);
+        header.appendChild(dateSpan);
+        // Essay text
+        const textDiv = document.createElement('div');
+        textDiv.className = 'essay-text';
+        textDiv.innerHTML = data.essay || '';
+        card.appendChild(header);
+        card.appendChild(textDiv);
+        // Word count
+        const rawText = textDiv.textContent || '';
+        const wordsArray = rawText.trim().split(/\s+/).filter(word => word.length > 0);
+        const wordCount = wordsArray.length;
+        const wordCountDiv = document.createElement('div');
+        wordCountDiv.className = 'word-count';
+        wordCountDiv.style.fontSize = '12px';
+        wordCountDiv.style.color = 'var(--text-muted)';
+        wordCountDiv.style.marginBottom = '4px';
+        wordCountDiv.textContent = `Word count: ${wordCount}`;
+        card.appendChild(wordCountDiv);
+        // Feedback block
+        if (data.feedback) {
+          const fb = document.createElement('div');
+          fb.className = 'feedback';
+          const lines = data.feedback.split('\n');
+          const formattedLines = lines.map(line => {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('✔')) {
+              const content = trimmed.substring(1).trim();
+              return '<span class="fb-check">' + escapeHtml(content) + '</span>';
+            } else if (trimmed.startsWith('✘')) {
+              const content = trimmed.substring(1).trim();
+              return '<span class="fb-cross">' + escapeHtml(content) + '</span>';
+            }
+            return escapeHtml(line);
+          });
+          fb.innerHTML = '<strong>Teacher Feedback:</strong><br>' + formattedLines.join('<br>');
+          card.appendChild(fb);
+        }
+        // Action buttons
+        const actions = document.createElement('div');
+        actions.className = 'essay-actions';
+        const editBtn = document.createElement('button');
+        editBtn.className = 'chip-btn chip-edit';
+        editBtn.textContent = 'Edit';
+        editBtn.onclick = () => openEditModal(docId, data);
+        const delBtn = document.createElement('button');
+        delBtn.className = 'chip-btn chip-delete';
+        delBtn.textContent = 'Delete';
+        delBtn.onclick = () => deleteEssay(docId);
+        delBtn.style.display = teacherMode ? 'inline-block' : 'none';
+        const fbBtn = document.createElement('button');
+        fbBtn.className = 'chip-btn chip-feedback';
+        fbBtn.textContent = 'Add/Edit Feedback';
+        fbBtn.style.display = teacherMode ? 'inline-block' : 'none';
+        fbBtn.onclick = () => openFeedbackModal(docId, data);
+        actions.appendChild(editBtn);
+        actions.appendChild(delBtn);
+        actions.appendChild(fbBtn);
+        // Add AI feedback button for each essay.  Users can click this
+        // button to request AI feedback on that specific essay.  A unique
+        // id is assigned so the button can be disabled after use.
+        const aiBtn = document.createElement('button');
+        aiBtn.className = 'chip-btn chip-feedback';
+        aiBtn.textContent = 'Get AI Feedback';
+        aiBtn.id = 'aiFeedbackBtn-' + docId;
+        aiBtn.onclick = () => getEssayAIFeedback(docId, data);
+        actions.appendChild(aiBtn);
+        card.appendChild(actions);
+        // Placeholder for AI feedback.  Initially hidden; will be populated
+        // when the AI feedback is returned from the server.
+        const aiFbDiv = document.createElement('div');
+        aiFbDiv.className = 'ai-feedback hidden';
+        aiFbDiv.id = 'aiFeedback-' + docId;
+        card.appendChild(aiFbDiv);
+        // Card sticker element for New Year mode (gift image). This remains decorative.
+        const cardSticker = document.createElement('img');
+        cardSticker.src = 'data:image/png;base64,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';
+        cardSticker.alt = 'Gift sticker';
+        cardSticker.className = 'card-sticker';
+        card.appendChild(cardSticker);
+
+        // Emoji sticker (🎁) to trigger showing the custom message
+        const cardEmoji = document.createElement('span');
+        cardEmoji.className = 'emoji-card-sticker';
+        cardEmoji.textContent = '🎁';
+        card.appendChild(cardEmoji);
+
+        // Container for the custom gift message; we fetch the message for the author
+        const giftMessageEl = document.createElement('div');
+        giftMessageEl.className = 'gift-message';
+        // We'll populate below
+        card.appendChild(giftMessageEl);
+
+        // Fetch the gift message asynchronously
+        const giftMsg = await getGiftMessage(data.name || '');
+        if (giftMsg) {
+          giftMessageEl.textContent = giftMsg;
+        }
+        // After awaiting an async call, ensure this render is still current
+        if (myRequestId !== essayRequestCounter) {
+          return;
+        }
+
+        // Toggle showing/hiding the message when the emoji is clicked
+        cardEmoji.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const visible = giftMessageEl.classList.contains('show-gift-message');
+          if (visible) {
+            giftMessageEl.classList.remove('show-gift-message');
+            giftMessageEl.classList.remove('pulse');
+          } else {
+            // Only show if there is content; if empty string, nothing to show
+            if (giftMessageEl.textContent && giftMessageEl.textContent.trim() !== '') {
+              giftMessageEl.classList.add('show-gift-message');
+              giftMessageEl.classList.add('pulse');
+            }
+          }
+        });
+
+        container.appendChild(card);
+      }
+    }
+
+    /**
+     * Handle essay search initiated by the user.  This helper reads the
+     * contents of the search input and calls renderEssays with the
+     * provided query.  If the input is empty, all essays are shown.
+     */
+        function searchEssays() {
+          const input = document.getElementById('essaySearch');
+          const query = input ? input.value.trim() : '';
+          // When the query is empty, show the full list of essays.  Otherwise
+          // filter by the query.  The second parameter is left as default
+          // (false) so that renderEssays shows all when empty.
+          renderEssays(query);
+        }
+
+    /** Submit a new essay to Firestore */
+    async function submitEssay() {
+      const nameInput = document.getElementById('name');
+      const essayInput = document.getElementById('essay');
+      const name = nameInput.value.trim();
+      const essay = essayInput.value.trim();
+      if (!essay) {
+        alert('Please write an essay before submitting.');
+        return;
+      }
+      // Capture current time once to ensure date and timestamp match
+      const now = new Date();
+      await addDoc(essaysRef, {
+        name: name || 'Unknown',
+        essay: essay,
+        date: formatDate(now),
+        timestamp: now.getTime(),
+        feedback: ''
+      });
+      renderEssays();
+      essayInput.value = '';
+      nameInput.value = '';
+      alert('Essay saved to the cloud.');
+    }
+
+    // Edit modal handlers
+    async function openEditModal(docId, data) {
+      currentEditId = docId;
+      currentEditName = data && data.name ? data.name : null;
+      const editArea = document.getElementById('editArea');
+      editArea.innerHTML = data.essay || '';
+      // Preload existing gift message for this author into the input
+      const giftInput = document.getElementById('giftMessageInput');
+      if (giftInput) {
+        const msg = await getGiftMessage(currentEditName || '');
+        giftInput.value = msg || '';
+      }
+      document.getElementById('editModal').style.display = 'flex';
+    }
+    function closeEditModal() {
+      document.getElementById('editModal').style.display = 'none';
+      currentEditId = null;
+    }
+    async function saveEdit() {
+      if (!currentEditId) return;
+      const updated = document.getElementById('editArea').innerHTML;
+      // Save the updated essay text
+      await updateDoc(doc(db, 'essays', currentEditId), { essay: updated });
+      // Save the gift message if provided
+      const giftInput = document.getElementById('giftMessageInput');
+      if (giftInput && currentEditName) {
+        const newMsg = giftInput.value.trim();
+        // Persist message across all essays by this author
+        await saveGiftMessage(currentEditName, newMsg);
+      }
+      // Re-render essays to update messages
+      await renderEssays();
+      closeEditModal();
+    }
+
+    // Feedback modal handlers
+    function openFeedbackModal(docId, data) {
+      currentFeedbackId = docId;
+      document.getElementById('feedbackArea').value = data.feedback || '';
+      const essayDiv = document.getElementById('feedbackEssay');
+      essayDiv.innerHTML = data.essay || '';
+      document.getElementById('feedbackModal').style.display = 'flex';
+    }
+    function closeFeedbackModal() {
+      document.getElementById('feedbackModal').style.display = 'none';
+      currentFeedbackId = null;
+    }
+    async function saveFeedback() {
+      if (!currentFeedbackId) return;
+      const updated = document.getElementById('feedbackArea').value;
+      const essayUpdated = document.getElementById('feedbackEssay').innerHTML;
+      await updateDoc(doc(db, 'essays', currentFeedbackId), { feedback: updated, essay: essayUpdated });
+      renderEssays();
+      closeFeedbackModal();
+    }
+
+    /** Delete an essay */
+    async function deleteEssay(docId) {
+      if (!confirm('Delete this essay?')) return;
+      await deleteDoc(doc(db, 'essays', docId));
+      renderEssays();
+    }
+
+    // Rich text formatting commands for the edit and feedback modals
+    function findTagParent(node, tagNames, editableParent) {
+      while (node && node !== editableParent) {
+        if (node.nodeType === 1) {
+          const nodeName = node.nodeName.toLowerCase();
+          if (tagNames.includes(nodeName)) {
+            return node;
+          }
+          if (node.classList) {
+            if (tagNames.includes('mark') && node.classList.contains('user-highlight')) return node;
+            if (tagNames.includes('u') && node.classList.contains('underline-text')) return node;
+            if (tagNames.includes('s') && node.classList.contains('strike-text')) return node;
+          }
+        }
+        node = node.parentNode;
+      }
+      return null;
+    }
+    function getEditableParent(sel) {
+      if (!sel.rangeCount) return null;
+      const range = sel.getRangeAt(0);
+      let containerNode = range.commonAncestorContainer;
+      let editableParent = null;
+      if (containerNode.nodeType === 1) {
+        editableParent = containerNode.closest('[contenteditable="true"]');
+      } else {
+        editableParent = containerNode.parentElement ? containerNode.parentElement.closest('[contenteditable="true"]') : null;
+      }
+      if (!editableParent || (editableParent.id !== 'editArea' && editableParent.id !== 'feedbackEssay')) return null;
+      return editableParent;
+    }
+    function highlightSelection() {
+      const sel = window.getSelection();
+      const editableParent = getEditableParent(sel);
+      if (!editableParent) return;
+      editableParent.focus();
+      const selectedText = sel.toString();
+      if (!selectedText) return;
+      let markParent = findTagParent(sel.anchorNode, ['mark'], editableParent) || findTagParent(sel.focusNode, ['mark'], editableParent);
+      if (markParent) {
+        const text = markParent.textContent;
+        markParent.replaceWith(document.createTextNode(text));
+      } else {
+        const markHtml = `<mark>${selectedText}</mark>`;
+        document.execCommand('insertHTML', false, markHtml);
+      }
+    }
+    function underlineSelection() {
+      const sel = window.getSelection();
+      const editableParent = getEditableParent(sel);
+      if (!editableParent) return;
+      editableParent.focus();
+      const selectedText = sel.toString();
+      if (!selectedText) return;
+      let underlineParent = findTagParent(sel.anchorNode, ['u'], editableParent) || findTagParent(sel.focusNode, ['u'], editableParent);
+      if (underlineParent) {
+        const text = underlineParent.textContent;
+        underlineParent.replaceWith(document.createTextNode(text));
+      } else {
+        const uHtml = `<u>${selectedText}</u>`;
+        document.execCommand('insertHTML', false, uHtml);
+      }
+    }
+    function strikeSelection() {
+      const sel = window.getSelection();
+      const editableParent = getEditableParent(sel);
+      if (!editableParent) return;
+      editableParent.focus();
+      const selectedText = sel.toString();
+      if (!selectedText) return;
+      let strikeParent = findTagParent(sel.anchorNode, ['s'], editableParent) || findTagParent(sel.focusNode, ['s'], editableParent);
+      if (strikeParent) {
+        const text = strikeParent.textContent;
+        strikeParent.replaceWith(document.createTextNode(text));
+      } else {
+        const sHtml = `<s>${selectedText}</s>`;
+        document.execCommand('insertHTML', false, sHtml);
+      }
+    }
+
+    // Teacher panel toggling
+    function toggleTeacherPanel() {
+      const panel = document.getElementById('teacherPanel');
+      panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+    }
+    function enterTeacherMode() {
+      const key = document.getElementById('teacherKey').value.trim();
+      if (!key) {
+        alert('Enter teacher key.');
+        return;
+      }
+      if (key === TEACHER_KEY) {
+        teacherMode = true;
+        alert('Teacher mode enabled.');
+        document.getElementById('teacherKey').value = '';
+        document.getElementById('teacherPanel').style.display = 'none';
+        renderEssays();
+      } else {
+        alert('Wrong key.');
+      }
+    }
+
+    /**
+     * Theme switching – extended from the original to support multiple themes.
+     * The Neon theme is treated as default when none of the other themes are
+     * specified.  Active button styling is updated accordingly.  All
+     * references to the removed Pangeya theme have been stripped. If an
+     * unknown theme is passed, the Neon theme is selected.
+     */
+    function setTheme(theme) {
+      const body = document.body;
+      // Remove any previously applied theme classes.  Glass theme is defined
+      // but unused by default; if you add a glass theme toggle in the UI,
+      // include 'glass-theme' here as well.
+      body.classList.remove('light-theme', 'dark-theme', 'pangeya-theme');
+      // Reset active states on buttons
+      document.getElementById('neonTheme').classList.remove('active');
+      document.getElementById('lightTheme').classList.remove('active');
+      document.getElementById('darkTheme').classList.remove('active');
+      // Duplicate theme buttons in vocabulary/chat sections do not exist in this
+      // version, but we defensively query them and remove their active class if present.
+      const neonV = document.getElementById('neonThemeV');
+      const lightV = document.getElementById('lightThemeV');
+      const darkV = document.getElementById('darkThemeV');
+      if (neonV) neonV.classList.remove('active');
+      if (lightV) lightV.classList.remove('active');
+      if (darkV) darkV.classList.remove('active');
+      if (theme === 'light') {
+        body.classList.add('light-theme');
+        document.getElementById('lightTheme').classList.add('active');
+        if (lightV) lightV.classList.add('active');
+      } else if (theme === 'dark') {
+        body.classList.add('dark-theme');
+        document.getElementById('darkTheme').classList.add('active');
+        if (darkV) darkV.classList.add('active');
+      } else {
+        // Fallback to Neon theme as default
+        document.getElementById('neonTheme').classList.add('active');
+        if (neonV) neonV.classList.add('active');
+      }
+    }
+
+    /**
+     * PDF download via jsPDF.  Retains the behaviour of the original site.
+     */
+    async function downloadPDF() {
+      const { jsPDF } = window.jspdf;
+      const docPDF = new jsPDF({ unit: 'pt', format: 'a4' });
+      let name = document.getElementById('name').value.trim();
+      let essay = document.getElementById('essay').value.trim();
+      if (!name || !essay) {
+        const snapshot = await getDocs(essaysRef);
+        const docsList = snapshot.docs;
+        if (docsList.length) {
+          const last = docsList[docsList.length - 1].data();
+          if (!name) name = last.name || 'Unknown';
+          if (!essay) essay = last.essay || '';
+        }
+      }
+      if (!essay) {
+        alert('There is no essay text to export.');
+        return;
+      }
+      if (!name) name = 'Unknown';
+      docPDF.setFontSize(22);
+      docPDF.setTextColor(140, 0, 255);
+      docPDF.text('Pangeya Essay Report', 40, 50);
+      docPDF.setFontSize(12);
+      docPDF.setTextColor(0, 0, 0);
+      docPDF.text('Name: ' + name, 40, 90);
+      // Use consistent date formatting in the exported PDF
+      const nowPDF = new Date();
+      docPDF.text('Date: ' + formatDate(nowPDF), 40, 110);
+      docPDF.setFontSize(14);
+      docPDF.setTextColor(30, 30, 30);
+      docPDF.text('Essay:', 40, 150);
+      const lines = docPDF.splitTextToSize(essay, 520);
+      docPDF.text(lines, 40, 180);
+      docPDF.save('pangeya-essay.pdf');
+    }
+
+    // Info and guide modals toggling
+    function toggleInfoModal() {
+      const infoModal = document.getElementById('infoModal');
+      if (!infoModal) return;
+      infoModal.style.display = infoModal.style.display === 'flex' ? 'none' : 'flex';
+    }
+    window.toggleInfoModal = toggleInfoModal;
+    function toggleGuideModal() {
+      const guideModal = document.getElementById('guideModal');
+      if (!guideModal) return;
+      guideModal.style.display = guideModal.style.display === 'flex' ? 'none' : 'flex';
+    }
+    window.toggleGuideModal = toggleGuideModal;
+
+    // Keyboard shortcuts to open modals
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === ';') {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleGuideModal();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === '`') {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleInfoModal();
+        return;
+      }
+    });
+    // Close modals when clicking outside content
+    window.addEventListener('click', (e) => {
+      const editM = document.getElementById('editModal');
+      const fbM = document.getElementById('feedbackModal');
+      if (e.target === editM) closeEditModal();
+      if (e.target === fbM) closeFeedbackModal();
+      const infoM = document.getElementById('infoModal');
+      const guideM = document.getElementById('guideModal');
+      if (e.target === infoM) toggleInfoModal();
+      if (e.target === guideM) toggleGuideModal();
+    });
+
+    // Event listeners for main controls
+    document.getElementById('submitBtn').addEventListener('click', submitEssay);
+    document.getElementById('pdfBtn').addEventListener('click', downloadPDF);
+    document.getElementById('teacherToggle').addEventListener('click', toggleTeacherPanel);
+    document.getElementById('teacherEnter').addEventListener('click', enterTeacherMode);
+    document.getElementById('neonTheme').addEventListener('click', () => setTheme('neon'));
+    document.getElementById('lightTheme').addEventListener('click', () => setTheme('light'));
+    document.getElementById('darkTheme').addEventListener('click', () => setTheme('dark'));
+
+    // Pangeya theme button has been removed.  Previously there was a handler
+    // attached to the Pangeya button to select the green palette.  Since
+    // the Pangeya theme is deprecated, this code has been omitted.
+
+    // Search input events: update essay list as the user types or clears the search
+    const essaySearchInput = document.getElementById('essaySearch');
+    if (essaySearchInput) {
+      // Re-render essays on every input change (typing or clearing)
+      essaySearchInput.addEventListener('input', () => {
+        searchEssays();
+      });
+      // Also allow pressing Enter to trigger the search explicitly
+      essaySearchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          searchEssays();
+        }
+      });
+    }
+
+    // Snowfall is always enabled; removed New Year toggle logic
+
+    // Initial render
+    renderEssays();
+
+    // Vocabulary removed: no need to render vocabulary list
+
+    // =============================================
+    // Vocabulary module
+    // Functions and event bindings for the vocabulary section are defined below.
+
+    // Show the vocabulary section and hide the essay section
+    function switchToVocab() {
+      const essaySection = document.getElementById('essaySection');
+      const vocabSection = document.getElementById('vocabSection');
+      if (essaySection && vocabSection) {
+        essaySection.style.display = 'none';
+        vocabSection.style.display = 'block';
+      }
+      // Hide chat section when switching to vocabulary
+      const chatSection = document.getElementById('chatSection');
+      if (chatSection) {
+        chatSection.style.display = 'none';
+      }
+    }
+
+    // Return to the essay section from the vocabulary section
+    function switchToEssays() {
+      const essaySection = document.getElementById('essaySection');
+      const vocabSection = document.getElementById('vocabSection');
+      if (essaySection && vocabSection) {
+        vocabSection.style.display = 'none';
+        essaySection.style.display = 'block';
+      }
+      // Hide chat section when returning to essays
+      const chatSection = document.getElementById('chatSection');
+      if (chatSection) {
+        chatSection.style.display = 'none';
+      }
+    }
+
+    // Render vocabulary items into the list. Items are sorted by timestamp descending.
+    async function renderVocab(query = '') {
+      const container = document.getElementById('vocabList');
+      if (!container) return;
+      // Increment the request counter and capture this call's id.
+      const myVocabRequestId = ++vocabRequestCounter;
+      container.innerHTML = '';
+      const snapshot = await getDocs(vocabRef);
+      // If a more recent request has been made, abort this render.
+      if (myVocabRequestId !== vocabRequestCounter) {
+        return;
+      }
+      if (snapshot.empty) {
+        container.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:2px 2px 6px;">No vocabulary items yet. Add your first word!</div>';
+        allVocab = [];
+        return;
+      }
+      const items = [];
+      snapshot.forEach(docSnap => {
+        items.push({ id: docSnap.id, data: docSnap.data() });
+      });
+      // Update global vocabulary state
+      allVocab = items;
+      const q = query.trim().toLowerCase();
+      let filtered = q ? allVocab.filter(item => ((item.data.word || '').toLowerCase().includes(q))) : allVocab;
+      // Sort descending by timestamp/date using the safe date helper.
+      filtered = filtered.slice().sort((a, b) => {
+        const tA = toDateSafe(a.data.timestamp ?? a.data.date).getTime();
+        const tB = toDateSafe(b.data.timestamp ?? b.data.date).getTime();
+        return tB - tA;
+      });
+      if (!filtered.length) {
+        const message = 'No results for "' + q + '".';
+        container.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:2px 2px 6px;">' + message + '</div>';
+        return;
+      }
+      // Build vocabulary cards sequentially.  Check the request id on
+      // each iteration to avoid interleaving stale renders when another
+      // renderVocab() call occurs.  If a newer request is detected,
+      // abort to prevent duplicates or mixed lists.
+      for (const item of filtered) {
+        if (myVocabRequestId !== vocabRequestCounter) {
+          return;
+        }
+        const data = item.data;
+        const card = document.createElement('div');
+        card.className = 'vocab-item';
+        const wordEl = document.createElement('div');
+        wordEl.className = 'vocab-word';
+        wordEl.textContent = data.word || 'Unknown';
+        const defEl = document.createElement('div');
+        defEl.className = 'vocab-definition';
+        defEl.innerHTML = data.definition ? escapeHtml(data.definition) : '';
+        // Create a delete button for this vocab entry
+        const delBtn = document.createElement('button');
+        delBtn.className = 'vocab-delete-btn';
+        delBtn.textContent = 'Delete';
+        delBtn.title = 'Delete word';
+        delBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          if (confirm('Delete this vocabulary entry?')) {
+            await deleteVocab(item.id);
+          }
+        });
+        // Append elements to the card
+        card.appendChild(wordEl);
+        card.appendChild(defEl);
+        card.appendChild(delBtn);
+        container.appendChild(card);
+      }
+    }
+
+    // Add a new vocabulary item. Supports single entry or multi-line enumerated list.
+    async function addVocab() {
+      const wordInput = document.getElementById('word');
+      const defInput = document.getElementById('definition');
+      if (!wordInput || !defInput) return;
+      const word = (wordInput.value || '').trim();
+      const definition = (defInput.value || '').trim();
+      // Single entry
+      if (word && definition) {
+        const nowVocab = new Date();
+        await addDoc(vocabRef, {
+          word: word,
+          definition: definition,
+          timestamp: nowVocab.getTime(),
+          date: formatDate(nowVocab)
+        });
+        wordInput.value = '';
+        defInput.value = '';
+        renderVocab();
+        alert('Word added successfully.');
+        return;
+      }
+      // Multi-line input
+      if (!definition) {
+        alert('Please enter some vocabulary entries or provide both a word and definition.');
+        return;
+      }
+      const lines = definition.split(/\n+/);
+      let addedCount = 0;
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        const noEnum = trimmed.replace(/^\s*\d+\.\s*/, '').replace(/^[-•]\s*/, '');
+        const parts = noEnum.split(/:\s*/);
+        if (parts.length < 2) continue;
+        let w = parts[0].trim();
+        let def = parts.slice(1).join(':').trim();
+        // Remove parts of speech in parentheses
+        w = w.replace(/\([^)]*\)/g, '').trim();
+        if (!w || !def) continue;
+        try {
+          const nowLine = new Date();
+          await addDoc(vocabRef, {
+            word: w,
+            definition: def,
+            timestamp: nowLine.getTime(),
+            date: formatDate(nowLine)
+          });
+          addedCount++;
+        } catch (err) {
+          console.error('Failed to add vocab:', err);
+        }
+      }
+      wordInput.value = '';
+      defInput.value = '';
+      renderVocab();
+      if (addedCount > 0) {
+        alert(addedCount + ' vocab item(s) added successfully.');
+      } else {
+        alert('No valid vocab entries found.');
+      }
+    }
+
+    // Search vocabulary by word
+    function searchVocab() {
+      const searchInput = document.getElementById('vocabSearch');
+      if (!searchInput) return;
+      const q = (searchInput.value || '').trim();
+      renderVocab(q);
+    }
+
+    /**
+     * Delete a vocabulary item by its document ID.  This helper calls
+     * Firestore's deleteDoc() and then re-renders the vocabulary list.
+     * A confirmation prompt should be shown by the caller before invoking
+     * this function.
+     * @param {string} id - The document ID of the vocabulary item to delete.
+     */
+    async function deleteVocab(id) {
+      if (!id) return;
+      try {
+        const ref = doc(vocabRef, id);
+        await deleteDoc(ref);
+        // Refresh the vocab list with the current search query, if any
+        const searchInput = document.getElementById('vocabSearch');
+        const q = searchInput ? (searchInput.value || '').trim() : '';
+        renderVocab(q);
+      } catch (err) {
+        console.error('Failed to delete vocab:', err);
+        alert('Failed to delete this vocabulary entry.');
+      }
+    }
+
+    // Bind vocabulary events
+    document.getElementById('addVocabBtn')?.addEventListener('click', addVocab);
+    document.getElementById('vocabSearchBtn')?.addEventListener('click', searchVocab);
+    const vocabSearchEl = document.getElementById('vocabSearch');
+    if (vocabSearchEl) {
+      vocabSearchEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          searchVocab();
+        }
+      });
+    }
+    const backBtn = document.getElementById('backToEssays');
+    if (backBtn) {
+      backBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        switchToEssays();
+      });
+    }
+
+    // Bind chat events
+    document.getElementById('chatSendBtn')?.addEventListener('click', sendChatMessage);
+    const chatInputEl = document.getElementById('chatInput');
+    if (chatInputEl) {
+      chatInputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendChatMessage();
+        }
+      });
+    }
+    const chatBackBtnEl = document.getElementById('chatBackBtn');
+    if (chatBackBtnEl) {
+      chatBackBtnEl.addEventListener('click', (e) => {
+        e.preventDefault();
+        switchToEssays();
+      });
+    }
+    // Bind image upload button: triggers the hidden file input click
+    // Image upload functionality has been removed from the chat.  No button binding is necessary.
+    // The image input is no longer present; no change listener is needed.
+    // Bind clear chat button
+    const chatClearBtnEl = document.getElementById('chatClearBtn');
+    if (chatClearBtnEl) {
+      chatClearBtnEl.addEventListener('click', (e) => {
+        e.preventDefault();
+        clearChat();
+      });
+    }
+
+    // Per-essay AI feedback buttons are added dynamically for each essay card; there is no global feedback button.
+
+    // Initialize chat credits display
+    updateChatCredit();
+
+    // Hide legacy sticker images for buttons and cards in case CSS fails to override.
+    // We prefer using emoji-based stickers instead of the old base64 images.
+    document.querySelectorAll('.btn-sticker, .card-sticker').forEach(el => {
+      el.style.display = 'none';
+    });
+    // Expose modal functions for inline handlers
+    window.openEditModal = openEditModal;
+    window.closeEditModal = closeEditModal;
+    window.saveEdit = saveEdit;
+    window.openFeedbackModal = openFeedbackModal;
+    window.closeFeedbackModal = closeFeedbackModal;
+    window.saveFeedback = saveFeedback;
+    // Expose formatting functions
+    window.highlightSelection = highlightSelection;
+    window.underlineSelection = underlineSelection;
+    window.strikeSelection = strikeSelection;
+
+    // Make section switching functions globally accessible so inline HTML
+    // onclick handlers can invoke them.  Without these assignments the
+    // functions live in the module scope and are unavailable to the anchor
+    // element defined in the HTML.
+    // Only expose the functions still used in the UI
+    window.switchToEssays = switchToEssays;
+    // Expose the weather toggle so it can be called from the weather button
+    window.toggleWeather = toggleWeather;
+  </script>
+</body>
+</html>
