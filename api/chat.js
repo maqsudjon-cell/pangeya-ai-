@@ -68,8 +68,16 @@ export default async function handler(req, res) {
       .json({ reply: reply.trim() });
   } catch (error) {
     console.error('Error in chat function:', error);
-    res.status(500)
+    // Surface a useful reason so the client (and you) can see what went wrong.
+    const status = error?.status || error?.response?.status;
+    let reason = 'Failed to generate a response from the AI.';
+    if (status === 401) reason = 'OpenAI rejected the API key (401). Check OPENAI_API_KEY in Vercel.';
+    else if (status === 429) reason = 'OpenAI rate limit or quota exceeded (429). Check your OpenAI billing/credits.';
+    else if (status === 404) reason = 'Model not found (404). The model name may be unavailable on this key.';
+    else if (error?.code === 'insufficient_quota') reason = 'OpenAI quota exhausted. Add credits to your OpenAI account.';
+    else if (error?.message) reason = 'AI error: ' + error.message;
+    res.status(status && status >= 400 ? status : 500)
       .setHeader('Access-Control-Allow-Origin', '*')
-      .json({ error: 'Failed to generate a response from the AI.' });
+      .json({ error: reason });
   }
 }
