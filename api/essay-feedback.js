@@ -50,8 +50,12 @@ export default async function handler(req, res) {
     return res.status(200).json({ feedback });
   } catch (error) {
     console.error("Essay feedback error:", error);
-    return res.status(500).json({
-      error: "AI feedback failed"
-    });
+    const status = error?.status || error?.response?.status;
+    let reason = "AI feedback failed";
+    if (status === 401) reason = "OpenAI rejected the API key (401). Check OPENAI_API_KEY in Vercel.";
+    else if (status === 429) reason = "OpenAI rate limit or quota exceeded (429). Check your OpenAI billing/credits.";
+    else if (error?.code === 'insufficient_quota') reason = "OpenAI quota exhausted. Add credits to your OpenAI account.";
+    else if (error?.message) reason = "AI error: " + error.message;
+    return res.status(status && status >= 400 ? status : 500).json({ error: reason });
   }
 }
