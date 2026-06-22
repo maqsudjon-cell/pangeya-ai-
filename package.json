@@ -4,6 +4,7 @@
   "description": "Vercel serverless functions for the Pangeya AI essay platform",
   "type": "module",
   "dependencies": {
-    "openai": "^4.4.0"
+    "openai": "^4.4.0",
+    "msedge-tts": "^2.0.6"
   }
 }
