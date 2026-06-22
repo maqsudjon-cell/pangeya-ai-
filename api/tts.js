@@ -1,21 +1,17 @@
 import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
 
-// PRIMARY: Groq Orpheus (canopylabs/orpheus-v1-english) — expressive, human-sounding.
-// We call Groq's OpenAI-compatible /audio/speech endpoint with a RAW fetch (the OpenAI SDK
-// mishandles Groq's binary audio response and throws a spurious "Connection error").
-// FALLBACK: free Microsoft Edge neural voices. The X-TTS-Engine header tells the client
-// which one actually served, so it stops retrying Orpheus when it's unavailable.
+// FREE neural TTS via Microsoft Edge's online voices (no key, no per-character cost).
+// Edge's "Multilingual" voices sound far more human than the older neural ones.
+// Orpheus (Groq) stays reachable via ?engine=orpheus but is NOT the default: it needs
+// model-terms acceptance (and likely billing), and we want this fully free.
 const groqKey = process.env.GROQ_API_KEY;
 
 const ORPHEUS_MODEL = 'canopylabs/orpheus-v1-english';
-const ORPHEUS_VOICE = 'autumn';   // warm, natural, conversational voice
+const ORPHEUS_VOICE = 'autumn';
 
-const EDGE_VOICES = [
-  'en-GB-SoniaNeural', 'en-GB-RyanNeural', 'en-GB-LibbyNeural',
-  'en-US-AriaNeural', 'en-US-JennyNeural', 'en-US-GuyNeural',
-  'en-AU-NatashaNeural'
-];
-const EDGE_DEFAULT = 'en-GB-SoniaNeural';
+const EDGE_DEFAULT = 'en-US-AvaMultilingualNeural'; // natural, warm, free
+const EDGE_SAFE    = 'en-GB-SoniaNeural';           // known-good retry if a voice is unavailable
+const VOICE_RE = /^[a-zA-Z]{2}-[A-Za-z]{2,}-[A-Za-z]+$/; // e.g. en-US-AvaMultilingualNeural
 
 function cors(res){
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -24,8 +20,29 @@ function cors(res){
   res.setHeader('Access-Control-Expose-Headers', 'X-TTS-Engine');
 }
 
+async function edgeSynth(text, voice){
+  const tts = new MsEdgeTTS();
+  await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+  const { audioStream } = tts.toStream(text);
+  const chunks = [];
+  await new Promise((resolve, reject) => {
+    audioStream.on('data', d => chunks.push(d));
+    audioStream.on('end', resolve);
+    audioStream.on('close', resolve);
+    audioStream.on('error', reject);
+  });
+  try { tts.close(); } catch (_) {}
+  return Buffer.concat(chunks);
+}
+
+async function viaEdge(text, voice){
+  const wanted = (voice && VOICE_RE.test(voice)) ? voice : EDGE_DEFAULT;
+  try { return await edgeSynth(text, wanted); }
+  catch (e) { if (wanted !== EDGE_SAFE) return await edgeSynth(text, EDGE_SAFE); throw e; }
+}
+
 async function viaOrpheus(text, voice){
-  const v = (voice && /^[a-zA-Z]+$/.test(voice)) ? voice : ORPHEUS_VOICE;   // Orpheus uses bare voice names
+  const v = (voice && /^[a-zA-Z]+$/.test(voice)) ? voice : ORPHEUS_VOICE;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 12000);
   try {
@@ -47,26 +64,9 @@ async function viaOrpheus(text, voice){
   }
 }
 
-async function viaEdge(text, voice){
-  const v = EDGE_VOICES.includes(voice) ? voice : EDGE_DEFAULT;
-  const tts = new MsEdgeTTS();
-  await tts.setMetadata(v, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
-  const { audioStream } = tts.toStream(text);
-  const chunks = [];
-  await new Promise((resolve, reject) => {
-    audioStream.on('data', d => chunks.push(d));
-    audioStream.on('end', resolve);
-    audioStream.on('close', resolve);
-    audioStream.on('error', reject);
-  });
-  try { tts.close(); } catch (_) {}
-  return Buffer.concat(chunks);
-}
-
 async function speak(res, text, voice, engine){
   const input = (text || '').toString().slice(0, 1200);
-  let want = (engine || '').toLowerCase();
-  if (want !== 'edge' && want !== 'orpheus') want = groqKey ? 'orpheus' : 'edge';
+  const want = (engine || '').toLowerCase() === 'orpheus' ? 'orpheus' : 'edge';   // default = free Edge
 
   let buf, used;
   if (want === 'orpheus' && groqKey) {
@@ -88,11 +88,9 @@ export default async function handler(req, res) {
   try {
     const p = req.method === 'GET' ? (req.query || {}) : (req.body || {});
     if (p.debug) {
-      const out = { groqConfigured: !!groqKey, model: ORPHEUS_MODEL, voice: ORPHEUS_VOICE };
-      if (groqKey) {
-        try { const b = await viaOrpheus('Hello, this is a quick test of the examiner voice.', (p.voice || '').toString()); out.orpheus = 'ok'; out.bytes = b.length; out.engineWouldUse = 'orpheus'; }
-        catch (e) { out.orpheus = 'FAILED'; out.orpheusError = (e && (e.message || String(e))) || 'unknown'; out.orpheusStatus = (e && (e.status || null)) || null; out.engineWouldUse = 'edge (orpheus failed -> fallback)'; }
-      } else { out.engineWouldUse = 'edge (GROQ_API_KEY not set)'; }
+      const out = { groqConfigured: !!groqKey, edgeDefault: EDGE_DEFAULT };
+      try { const b = await viaEdge('Hello, this is a quick test of the examiner voice.', (p.voice || '').toString()); out.edge = 'ok'; out.bytes = b.length; }
+      catch (e) { out.edge = 'FAILED'; out.edgeError = (e && (e.message || String(e))) || 'unknown'; }
       cors(res); res.status(200).json(out); return;
     }
     const text = (p.text || '').toString();
