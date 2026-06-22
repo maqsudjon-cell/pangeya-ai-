@@ -1,62 +1,58 @@
 import { OpenAI } from 'openai';
 
-// Reuses the same OPENAI_API_KEY env var already configured in Vercel for chat.
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
 const VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
 
-/**
- * Text-to-speech proxy. POST { text, voice?, model? } -> audio/mpeg (mp3).
- * Gives the AI examiner a natural, human-sounding voice instead of the
- * robotic browser speech synthesis. CORS is open so GitHub Pages can call it.
- */
+function cors(res){
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
+async function synth(res, text, voice, model){
+  const input = (text || '').slice(0, 1500);
+  const v = VOICES.includes(voice) ? voice : 'fable';
+  const speech = await openai.audio.speech.create({ model: model || 'tts-1', voice: v, input, response_format: 'mp3' });
+  res.status(200);
+  cors(res);
+  res.setHeader('Content-Type', 'audio/mpeg');
+  res.setHeader('Cache-Control', 'no-store');
+  const body = speech.body;
+  // stream chunks as they arrive (low latency); fall back to buffered
+  if (body && typeof body.getReader === 'function') {
+    const reader = body.getReader();
+    for (;;) { const { done, value } = await reader.read(); if (done) break; res.write(Buffer.from(value)); }
+    res.end();
+  } else if (body && typeof body.pipe === 'function') {
+    body.pipe(res);
+  } else {
+    res.end(Buffer.from(await speech.arrayBuffer()));
+  }
+}
+
 export default async function handler(req, res) {
-  if (req.method === 'OPTIONS') {
-    res.status(200)
-      .setHeader('Access-Control-Allow-Origin', '*')
-      .setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-      .setHeader('Access-Control-Allow-Headers', 'Content-Type')
-      .end();
-    return;
-  }
-  if (req.method !== 'POST') {
-    res.status(405).setHeader('Access-Control-Allow-Origin', '*').json({ error: 'Method not allowed' });
-    return;
-  }
-
-  const { text, voice, model } = req.body || {};
-  if (!text || typeof text !== 'string' || !text.trim()) {
-    res.status(400).setHeader('Access-Control-Allow-Origin', '*').json({ error: 'Missing text' });
-    return;
-  }
-
-  const input = text.slice(0, 1500);                       // cap length for cost/latency
-  const v = VOICES.includes(voice) ? voice : 'fable';      // warm, British-leaning examiner voice
-
+  if (req.method === 'OPTIONS') { res.status(200); cors(res); res.end(); return; }
   try {
-    const speech = await openai.audio.speech.create({
-      model: model || 'tts-1',
-      voice: v,
-      input,
-      response_format: 'mp3'
-    });
-    const buffer = Buffer.from(await speech.arrayBuffer());
-
-    res.status(200);
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('Cache-Control', 'no-store');
-    res.end(buffer);
+    if (req.method === 'GET') {
+      const text = (req.query?.text || '').toString();
+      if (!text.trim()) { res.status(400); cors(res); res.json({ error: 'Missing text' }); return; }
+      await synth(res, text, (req.query?.voice || '').toString(), (req.query?.model || '').toString());
+      return;
+    }
+    if (req.method === 'POST') {
+      const { text, voice, model } = req.body || {};
+      if (!text || !String(text).trim()) { res.status(400); cors(res); res.json({ error: 'Missing text' }); return; }
+      await synth(res, text, voice, model);
+      return;
+    }
+    res.status(405); cors(res); res.json({ error: 'Method not allowed' });
   } catch (error) {
     const status = error?.status || error?.response?.status;
     let reason = 'Text-to-speech failed.';
-    if (status === 401) reason = 'OpenAI rejected the API key (401). Check OPENAI_API_KEY in Vercel.';
-    else if (status === 429) reason = 'OpenAI rate limit or quota exceeded (429).';
-    else if (status === 404) reason = 'TTS model not found (404) for this key.';
-    else if (error?.code === 'insufficient_quota') reason = 'OpenAI quota exhausted.';
+    if (status === 401) reason = 'OpenAI rejected the API key (401).';
+    else if (status === 429) reason = 'OpenAI rate limit or quota (429).';
     else if (error?.message) reason = 'TTS error: ' + error.message;
-    res.status(status && status >= 400 ? status : 500)
-      .setHeader('Access-Control-Allow-Origin', '*')
-      .json({ error: reason });
+    if (!res.headersSent) { res.status(status && status >= 400 ? status : 500); cors(res); res.json({ error: reason }); }
+    else { try { res.end(); } catch (_) {} }
   }
 }
