@@ -1,85 +1,56 @@
-import { OpenAI } from 'openai';
+import OpenAI from 'openai';
 
-// Initialize the OpenAI client using the API key from the environment.  Vercel
-// provides environment variables through process.env when deployed.  The
-// "OPENAI_API_KEY" variable must be defined in your Vercel project
-// settings for this function to succeed.  Do not hard-code the key in
-// source code to keep it secure.
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+// Groq = free + extremely fast (LPU). OpenAI kept as a fallback if Groq is unset/errors.
+const oaKey = process.env.OPENAI_API_KEY;
+const groqKey = process.env.GROQ_API_KEY;
+const oa = oaKey ? new OpenAI({ apiKey: oaKey }) : null;
+const groq = groqKey ? new OpenAI({ apiKey: groqKey, baseURL: 'https://api.groq.com/openai/v1' }) : null;
 
-/**
- * Vercel serverless function that proxies chat messages to OpenAI's chat API.
- *
- * The client should send a POST request with a JSON body containing the
- * following fields:
- *   - message: the latest user message (string)
- *   - chatHistory: array of prior messages in the format { role, content }
- *   - systemPrompt: a system prompt to instruct the assistant
- *   - model: (optional) the OpenAI model identifier to use
- *   - userId: (optional) a unique identifier for the user
- *
- * This function responds with a JSON payload containing either a
- * "reply" field with the assistant's message or an "error" field.
- * CORS headers are added to allow requests from any origin.
- */
+const GROQ_MODEL = 'llama-3.3-70b-versatile';   // fast + good quality on Groq
+
+function cors(res){
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
 export default async function handler(req, res) {
-  // Allow preflight requests
-  if (req.method === 'OPTIONS') {
-    res.status(200)
-      .setHeader('Access-Control-Allow-Origin', '*')
-      .setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-      .setHeader('Access-Control-Allow-Headers', 'Content-Type')
-      .end();
-    return;
-  }
-  if (req.method !== 'POST') {
-    res.status(405)
-      .setHeader('Access-Control-Allow-Origin', '*')
-      .json({ error: 'Method not allowed' });
-    return;
-  }
-  // Extract payload
+  if (req.method === 'OPTIONS') { res.status(200); cors(res); res.end(); return; }
+  if (req.method !== 'POST') { res.status(405); cors(res); res.json({ error: 'Method not allowed' }); return; }
+
   const { message, chatHistory, systemPrompt, model, maxTokens } = req.body || {};
-  if (!message || !Array.isArray(chatHistory) || !systemPrompt) {
-    res.status(400)
-      .setHeader('Access-Control-Allow-Origin', '*')
-      .json({ error: 'Invalid request payload' });
-    return;
+  if (!message || typeof message !== 'string') { res.status(400); cors(res); res.json({ error: 'Missing message' }); return; }
+
+  const messages = [];
+  if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+  if (Array.isArray(chatHistory)) {
+    for (const m of chatHistory) {
+      if (m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string') {
+        messages.push({ role: m.role, content: m.content });
+      }
+    }
   }
+  messages.push({ role: 'user', content: message });
+
+  const base = { messages, temperature: 0.7 };
+  if (Number.isFinite(maxTokens) && maxTokens > 0) base.max_tokens = Math.min(maxTokens, 500);
+
+  const viaGroq   = async () => (await groq.chat.completions.create({ ...base, model: GROQ_MODEL })).choices?.[0]?.message?.content || '';
+  const viaOpenAI = async () => (await oa.chat.completions.create({ ...base, model: model || 'gpt-4o-mini' })).choices?.[0]?.message?.content || '';
+
   try {
-    // Construct messages array: system prompt first, followed by prior
-    // conversation history and the latest user message.  The chat API will
-    // use this context to generate a coherent reply.
-    const messages = [
-      { role: 'system', content: systemPrompt },
-      ...chatHistory.map(m => ({ role: m.role, content: m.content })),
-      { role: 'user', content: message }
-    ];
-    const params = {
-      model: model || 'gpt-3.5-turbo',
-      messages,
-      temperature: 0.7
-    };
-    if (Number.isFinite(maxTokens) && maxTokens > 0) params.max_tokens = Math.min(maxTokens, 500);
-    const completion = await openai.chat.completions.create(params);
-    const reply = completion.choices?.[0]?.message?.content || '';
-    res.status(200)
-      .setHeader('Access-Control-Allow-Origin', '*')
-      .json({ reply: reply.trim() });
+    let reply = '';
+    if (groq) { try { reply = await viaGroq(); } catch (e) { if (oa) reply = await viaOpenAI(); else throw e; } }
+    else if (oa) { reply = await viaOpenAI(); }
+    else { res.status(500); cors(res); res.json({ error: 'No AI provider configured (set GROQ_API_KEY or OPENAI_API_KEY)' }); return; }
+
+    res.status(200); cors(res); res.json({ reply });
   } catch (error) {
-    console.error('Error in chat function:', error);
-    // Surface a useful reason so the client (and you) can see what went wrong.
     const status = error?.status || error?.response?.status;
-    let reason = 'Failed to generate a response from the AI.';
-    if (status === 401) reason = 'OpenAI rejected the API key (401). Check OPENAI_API_KEY in Vercel.';
-    else if (status === 429) reason = 'OpenAI rate limit or quota exceeded (429). Check your OpenAI billing/credits.';
-    else if (status === 404) reason = 'Model not found (404). The model name may be unavailable on this key.';
-    else if (error?.code === 'insufficient_quota') reason = 'OpenAI quota exhausted. Add credits to your OpenAI account.';
+    let reason = 'AI request failed.';
+    if (status === 401) reason = 'API key rejected (401).';
+    else if (status === 429) reason = 'Rate limit or quota (429).';
     else if (error?.message) reason = 'AI error: ' + error.message;
-    res.status(status && status >= 400 ? status : 500)
-      .setHeader('Access-Control-Allow-Origin', '*')
-      .json({ error: reason });
+    res.status(status && status >= 400 ? status : 500); cors(res); res.json({ error: reason });
   }
 }
