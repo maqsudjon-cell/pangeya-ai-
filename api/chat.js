@@ -41,7 +41,7 @@ export default async function handler(req, res) {
     return;
   }
   // Extract payload
-  const { message, chatHistory, systemPrompt, model } = req.body || {};
+  const { message, chatHistory, systemPrompt, model, maxTokens } = req.body || {};
   if (!message || !Array.isArray(chatHistory) || !systemPrompt) {
     res.status(400)
       .setHeader('Access-Control-Allow-Origin', '*')
@@ -57,11 +57,13 @@ export default async function handler(req, res) {
       ...chatHistory.map(m => ({ role: m.role, content: m.content })),
       { role: 'user', content: message }
     ];
-    const completion = await openai.chat.completions.create({
+    const params = {
       model: model || 'gpt-3.5-turbo',
       messages,
       temperature: 0.7
-    });
+    };
+    if (Number.isFinite(maxTokens) && maxTokens > 0) params.max_tokens = Math.min(maxTokens, 500);
+    const completion = await openai.chat.completions.create(params);
     const reply = completion.choices?.[0]?.message?.content || '';
     res.status(200)
       .setHeader('Access-Control-Allow-Origin', '*')
