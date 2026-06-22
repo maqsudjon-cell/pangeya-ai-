@@ -1,15 +1,14 @@
-import OpenAI from 'openai';
 import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
 
-// PRIMARY: Groq Orpheus (canopylabs/orpheus-v1-english) — expressive, human-sounding,
-// fast on Groq LPUs, billed per character. FALLBACK: free Microsoft Edge neural voices.
-// If Orpheus is unavailable (e.g. billing not enabled), we transparently fall back to Edge
-// and tell the client via the X-TTS-Engine header so it stops retrying Orpheus.
+// PRIMARY: Groq Orpheus (canopylabs/orpheus-v1-english) — expressive, human-sounding.
+// We call Groq's OpenAI-compatible /audio/speech endpoint with a RAW fetch (the OpenAI SDK
+// mishandles Groq's binary audio response and throws a spurious "Connection error").
+// FALLBACK: free Microsoft Edge neural voices. The X-TTS-Engine header tells the client
+// which one actually served, so it stops retrying Orpheus when it's unavailable.
 const groqKey = process.env.GROQ_API_KEY;
-const groq = groqKey ? new OpenAI({ apiKey: groqKey, baseURL: 'https://api.groq.com/openai/v1' }) : null;
 
 const ORPHEUS_MODEL = 'canopylabs/orpheus-v1-english';
-const ORPHEUS_VOICE = 'autumn';   // warm, natural, conversational female voice
+const ORPHEUS_VOICE = 'autumn';   // warm, natural, conversational voice
 
 const EDGE_VOICES = [
   'en-GB-SoniaNeural', 'en-GB-RyanNeural', 'en-GB-LibbyNeural',
@@ -26,11 +25,26 @@ function cors(res){
 }
 
 async function viaOrpheus(text, voice){
-  const v = (voice && /^[a-zA-Z]+$/.test(voice)) ? voice : ORPHEUS_VOICE;   // Orpheus uses bare names
-  const r = await groq.audio.speech.create({
-    model: ORPHEUS_MODEL, voice: v, input: text, response_format: 'mp3'
-  });
-  return Buffer.from(await r.arrayBuffer());
+  const v = (voice && /^[a-zA-Z]+$/.test(voice)) ? voice : ORPHEUS_VOICE;   // Orpheus uses bare voice names
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 12000);
+  try {
+    const r = await fetch('https://api.groq.com/openai/v1/audio/speech', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + groqKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: ORPHEUS_MODEL, voice: v, input: text, response_format: 'mp3' }),
+      signal: ctrl.signal
+    });
+    if (!r.ok) {
+      const body = await r.text().catch(() => '');
+      const e = new Error('Groq TTS HTTP ' + r.status + (body ? (': ' + body.slice(0, 300)) : ''));
+      e.status = r.status;
+      throw e;
+    }
+    return Buffer.from(await r.arrayBuffer());
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function viaEdge(text, voice){
@@ -52,10 +66,10 @@ async function viaEdge(text, voice){
 async function speak(res, text, voice, engine){
   const input = (text || '').toString().slice(0, 1200);
   let want = (engine || '').toLowerCase();
-  if (want !== 'edge' && want !== 'orpheus') want = groq ? 'orpheus' : 'edge';
+  if (want !== 'edge' && want !== 'orpheus') want = groqKey ? 'orpheus' : 'edge';
 
   let buf, used;
-  if (want === 'orpheus' && groq) {
+  if (want === 'orpheus' && groqKey) {
     try { buf = await viaOrpheus(input, voice); used = 'orpheus'; }
     catch (e) { buf = await viaEdge(input, voice); used = 'edge'; }
   } else {
@@ -74,10 +88,10 @@ export default async function handler(req, res) {
   try {
     const p = req.method === 'GET' ? (req.query || {}) : (req.body || {});
     if (p.debug) {
-      const out = { groqConfigured: !!groq, model: ORPHEUS_MODEL, voice: ORPHEUS_VOICE };
-      if (groq) {
+      const out = { groqConfigured: !!groqKey, model: ORPHEUS_MODEL, voice: ORPHEUS_VOICE };
+      if (groqKey) {
         try { const b = await viaOrpheus('Hello, this is a quick test of the examiner voice.', (p.voice || '').toString()); out.orpheus = 'ok'; out.bytes = b.length; out.engineWouldUse = 'orpheus'; }
-        catch (e) { out.orpheus = 'FAILED'; out.orpheusError = (e && (e.message || String(e))) || 'unknown'; out.orpheusStatus = (e && (e.status || (e.response && e.response.status))) || null; out.engineWouldUse = 'edge (orpheus failed -> fallback)'; }
+        catch (e) { out.orpheus = 'FAILED'; out.orpheusError = (e && (e.message || String(e))) || 'unknown'; out.orpheusStatus = (e && (e.status || null)) || null; out.engineWouldUse = 'edge (orpheus failed -> fallback)'; }
       } else { out.engineWouldUse = 'edge (GROQ_API_KEY not set)'; }
       cors(res); res.status(200).json(out); return;
     }
