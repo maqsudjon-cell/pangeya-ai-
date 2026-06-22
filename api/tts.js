@@ -73,6 +73,14 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') { res.status(200); cors(res); res.end(); return; }
   try {
     const p = req.method === 'GET' ? (req.query || {}) : (req.body || {});
+    if (p.debug) {
+      const out = { groqConfigured: !!groq, model: ORPHEUS_MODEL, voice: ORPHEUS_VOICE };
+      if (groq) {
+        try { const b = await viaOrpheus('Hello, this is a quick test of the examiner voice.', (p.voice || '').toString()); out.orpheus = 'ok'; out.bytes = b.length; out.engineWouldUse = 'orpheus'; }
+        catch (e) { out.orpheus = 'FAILED'; out.orpheusError = (e && (e.message || String(e))) || 'unknown'; out.orpheusStatus = (e && (e.status || (e.response && e.response.status))) || null; out.engineWouldUse = 'edge (orpheus failed -> fallback)'; }
+      } else { out.engineWouldUse = 'edge (GROQ_API_KEY not set)'; }
+      cors(res); res.status(200).json(out); return;
+    }
     const text = (p.text || '').toString();
     if (!text.trim()) { res.status(400); cors(res); res.json({ error: 'Missing text' }); return; }
     if (req.method !== 'GET' && req.method !== 'POST') { res.status(405); cors(res); res.json({ error: 'Method not allowed' }); return; }
