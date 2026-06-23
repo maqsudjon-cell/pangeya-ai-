@@ -1,56 +1,37 @@
 import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
 
-// FREE neural TTS via Microsoft Edge's online voices (no key, no cost). Audio is STREAMED
-// to the client so playback starts almost immediately (no waiting for the full clip).
-// Orpheus (Groq) stays reachable via ?engine=orpheus but is not the default (needs terms/billing).
+// FREE neural TTS via Microsoft Edge's online voices (no key, no cost).
+// The clip is synthesized fully, then served with Content-Length + HTTP Range support so
+// iOS Safari plays it progressively/seekably. A no-Content-Length chunked stream stalls on
+// iOS; for the short examiner replies, buffer-then-serve is fast, and the front-end also
+// falls back to an instant on-device voice if synthesis is ever slow.
+// Orpheus (Groq) stays reachable via ?engine=orpheus but isn't the default (needs terms/billing).
 const groqKey = process.env.GROQ_API_KEY;
 
 const ORPHEUS_MODEL = 'canopylabs/orpheus-v1-english';
 const ORPHEUS_VOICE = 'autumn';
 
-const EDGE_DEFAULT = 'en-US-AvaMultilingualNeural'; // natural, warm, free
-const EDGE_SAFE    = 'en-GB-SoniaNeural';           // known-good retry if a voice is unavailable
+const EDGE_DEFAULT = 'en-US-JennyNeural'; // natural AND fast to synthesize (Multilingual voices like Ava are slower)
+const EDGE_SAFE    = 'en-GB-SoniaNeural'; // known-good retry if a voice is unavailable
 const VOICE_RE = /^[a-zA-Z]{2}-[A-Za-z]{2,}-[A-Za-z]+$/;
+
+// 48kbit mono mp3 (~6 KB/s) is compact; the package exposes only 48k/96k mono mp3.
+// mp3 is the safe choice for iOS <audio> (opus support there is inconsistent).
+const FORMAT = OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3;
 
 function cors(res){
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Access-Control-Expose-Headers', 'X-TTS-Engine');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range');
+  res.setHeader('Access-Control-Expose-Headers', 'X-TTS-Engine, Content-Length, Content-Range, Accept-Ranges');
 }
 
-async function setupEdge(text, voice){
-  const t = new MsEdgeTTS();
-  await t.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
-  const { audioStream } = t.toStream(text);
-  return { t, audioStream };
-}
-
-// Fast path: stream Edge audio chunks to the response as they're produced.
-async function edgeStream(res, text, voice){
-  const wanted = (voice && VOICE_RE.test(voice)) ? voice : EDGE_DEFAULT;
-  let s;
-  try { s = await setupEdge(text, wanted); }
-  catch (e) { if (wanted !== EDGE_SAFE) s = await setupEdge(text, EDGE_SAFE); else throw e; }
-  cors(res);
-  res.setHeader('Content-Type', 'audio/mpeg');
-  res.setHeader('Cache-Control', 'no-store');
-  res.setHeader('X-TTS-Engine', 'edge');
-  res.status(200);
-  await new Promise((resolve, reject) => {
-    s.audioStream.on('data', d => { try { res.write(d); } catch (_) {} });
-    s.audioStream.on('end', resolve);
-    s.audioStream.on('close', resolve);
-    s.audioStream.on('error', reject);
-  });
-  try { s.t.close(); } catch (_) {}
-  res.end();
-}
-
-// Buffered Edge (used only by ?debug=1).
+// Synthesize the whole clip into a Buffer (Edge emits chunks; we collect them).
 async function edgeBuffer(text, voice){
   const synth = async (v) => {
-    const { t, audioStream } = await setupEdge(text, v);
+    const t = new MsEdgeTTS();
+    await t.setMetadata(v, FORMAT);
+    const { audioStream } = t.toStream(text);
     const chunks = [];
     await new Promise((resolve, reject) => {
       audioStream.on('data', d => chunks.push(d));
@@ -64,6 +45,34 @@ async function edgeBuffer(text, voice){
   const wanted = (voice && VOICE_RE.test(voice)) ? voice : EDGE_DEFAULT;
   try { return await synth(wanted); }
   catch (e) { if (wanted !== EDGE_SAFE) return await synth(EDGE_SAFE); throw e; }
+}
+
+// Serve an audio Buffer with Content-Length + Range (206) so iOS plays/seeks reliably.
+function sendAudio(req, res, buf, engine){
+  cors(res);
+  res.setHeader('Content-Type', 'audio/mpeg');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Accept-Ranges', 'bytes');
+  res.setHeader('X-TTS-Engine', engine);
+  const total = buf.length;
+  const range = req.headers && req.headers.range;
+  const m = range && /bytes=(\d*)-(\d*)/.exec(range);
+  if (m) {
+    let start = m[1] === '' ? 0 : parseInt(m[1], 10);
+    let end   = m[2] === '' ? total - 1 : parseInt(m[2], 10);
+    if (isNaN(start) || start < 0) start = 0;
+    if (isNaN(end) || end >= total) end = total - 1;
+    if (start > end) start = 0;
+    const slice = buf.subarray(start, end + 1);
+    res.setHeader('Content-Range', `bytes ${start}-${end}/${total}`);
+    res.setHeader('Content-Length', slice.length);
+    res.statusCode = 206;
+    res.end(slice);
+    return;
+  }
+  res.setHeader('Content-Length', total);
+  res.statusCode = 200;
+  res.end(buf);
 }
 
 async function viaOrpheus(text, voice){
@@ -86,17 +95,15 @@ async function viaOrpheus(text, voice){
   } finally { clearTimeout(timer); }
 }
 
-async function speak(res, text, voice, engine){
+async function speak(req, res, text, voice, engine){
   const input = (text || '').toString().slice(0, 1200);
   const want = (engine || '').toLowerCase() === 'orpheus' ? 'orpheus' : 'edge';
   if (want === 'orpheus' && groqKey) {
-    try {
-      const buf = await viaOrpheus(input, voice);
-      cors(res); res.setHeader('Content-Type', 'audio/mpeg'); res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-TTS-Engine', 'orpheus');
-      res.status(200).end(buf); return;
-    } catch (e) { /* fall through to streaming Edge */ }
+    try { const buf = await viaOrpheus(input, voice); sendAudio(req, res, buf, 'orpheus'); return; }
+    catch (e) { /* fall through to Edge */ }
   }
-  await edgeStream(res, input, voice);
+  const buf = await edgeBuffer(input, voice);
+  sendAudio(req, res, buf, 'edge');
 }
 
 export default async function handler(req, res) {
@@ -112,7 +119,7 @@ export default async function handler(req, res) {
     const text = (p.text || '').toString();
     if (!text.trim()) { res.status(400); cors(res); res.json({ error: 'Missing text' }); return; }
     if (req.method !== 'GET' && req.method !== 'POST') { res.status(405); cors(res); res.json({ error: 'Method not allowed' }); return; }
-    await speak(res, text, (p.voice || '').toString(), (p.engine || '').toString());
+    await speak(req, res, text, (p.voice || '').toString(), (p.engine || '').toString());
   } catch (error) {
     if (!res.headersSent) { res.status(500); cors(res); res.json({ error: 'TTS error: ' + (error?.message || 'failed') }); }
     else { try { res.end(); } catch (_) {} }
