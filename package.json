@@ -1,10 +1,12 @@
 {
   "name": "pangeya-ai-backend",
   "version": "1.0.0",
-  "description": "Vercel serverless functions for the Pangeya AI essay platform",
+  "description": "Vercel serverless functions for the Flarestamina AI platform",
   "type": "module",
   "dependencies": {
     "openai": "^4.4.0",
-    "msedge-tts": "^2.0.6"
+    "msedge-tts": "^2.0.6",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2"
   }
 }
